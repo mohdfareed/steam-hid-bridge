@@ -1,6 +1,12 @@
 name: Release
 
 on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Package version to test.
+        required: true
+        default: 0.0.0-test
   push:
     tags:
       - "v*.*.*"
@@ -24,17 +30,23 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v5
         with:
-          dotnet-version: latest
+          dotnet-version: 10.x
 
-      - name: Validate tag
+      - name: Resolve version
         shell: pwsh
         run: |
-          $tag = "${{ github.ref_name }}"
-          if ($tag -notmatch '^v\d+\.\d+\.\d+$') {
-              throw "Release tags must match vMAJOR.MINOR.PATCH, for example v0.1.1. Got '$tag'."
+          if ("${{ github.event_name }}" -eq "workflow_dispatch") {
+              $version = "${{ inputs.version }}"
+          }
+          else {
+              $tag = "${{ github.ref_name }}"
+              if ($tag -notmatch '^v\d+\.\d+\.\d+$') {
+                  throw "Release tags must match vMAJOR.MINOR.PATCH, for example v0.1.1. Got '$tag'."
+              }
+
+              $version = $tag.Substring(1)
           }
 
-          $version = $tag.Substring(1)
           "VERSION=$version" >> $env:GITHUB_ENV
 
       - name: Build
@@ -50,6 +62,7 @@ jobs:
         run: .\scripts\package-release.ps1 -Configuration Release -Runtime $env:RUNTIME -Version $env:VERSION
 
       - name: Create GitHub release
+        if: github.event_name == 'push'
         shell: pwsh
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -57,3 +70,10 @@ jobs:
           $tag = "${{ github.ref_name }}"
           $asset = Join-Path "artifacts" $env:PACKAGE_NAME
           gh release create $tag $asset --verify-tag --title "Steam HID Bridge $tag" --generate-notes
+
+      - name: Upload package artifact
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: SteamHidBridge-${{ env.RUNTIME }}
+          path: artifacts/${{ env.PACKAGE_NAME }}
