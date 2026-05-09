@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
@@ -42,7 +43,15 @@ public sealed partial class MainWindowViewModel
             return Task.CompletedTask;
         }
 
-        ReloadGameIds(newId);
+        if (settingsStore.Document.Games.TryGetValue(newId, out GameProfile? savedProfile))
+        {
+            ReloadGameIds(newId, savedProfile);
+        }
+        else
+        {
+            ReloadGameIds(newId);
+        }
+
         SetActivity($"Saved {newId}.");
         return Task.CompletedTask;
     }
@@ -196,23 +205,62 @@ public sealed partial class MainWindowViewModel
             settingsStore.Document.Games[selectedId] = selectedProfile;
         }
 
+        ReloadGameIds(selectedId, selectedProfile);
+    }
+
+    private void ReloadGameIds(string selectedId, GameProfile selectedProfile)
+    {
         isReloadingGameIds = true;
         try
         {
-            GameIds.Clear();
-            foreach (string gameId in settingsStore.Document.Games.Keys.Order(StringComparer.OrdinalIgnoreCase))
-            {
-                GameIds.Add(gameId);
-            }
+            SyncGameIds();
         }
         finally
         {
             isReloadingGameIds = false;
         }
 
-        selectedGameId = string.Empty;
         LoadEditor(selectedId, selectedProfile);
-        OnPropertyChanged(nameof(SelectedGameId));
+    }
+
+    private void SyncGameIds()
+    {
+        List<string> sortedGameIds = [.. settingsStore.Document.Games.Keys.Order(StringComparer.OrdinalIgnoreCase)];
+
+        for (int i = GameIds.Count - 1; i >= 0; i--)
+        {
+            if (!sortedGameIds.Contains(GameIds[i], StringComparer.OrdinalIgnoreCase))
+            {
+                GameIds.RemoveAt(i);
+            }
+        }
+
+        for (int i = 0; i < sortedGameIds.Count; i++)
+        {
+            string gameId = sortedGameIds[i];
+            int currentIndex = IndexOfGameId(gameId);
+            if (currentIndex < 0)
+            {
+                GameIds.Insert(i, gameId);
+            }
+            else if (currentIndex != i)
+            {
+                GameIds.Move(currentIndex, i);
+            }
+        }
+    }
+
+    private int IndexOfGameId(string gameId)
+    {
+        for (int i = 0; i < GameIds.Count; i++)
+        {
+            if (string.Equals(GameIds[i], gameId, StringComparison.OrdinalIgnoreCase))
+            {
+                return i;
+            }
+        }
+
+        return -1;
     }
 
     private string ResolveSelectedGameId(string requestedId)
