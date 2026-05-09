@@ -32,7 +32,7 @@ public sealed class BridgeFrameTests
     [TestMethod]
     public void TryDecodeRejectsCorruptChecksum()
     {
-        byte[] bytes = new BridgeFrame(BridgeCommand.Ping, Sequence: 1, []).Encode();
+        byte[] bytes = new BridgeFrame(BridgeCommand.HidInput, Sequence: 1, []).Encode();
         bytes[^1] ^= 0x7f;
 
         bool decoded = BridgeFrame.TryDecode(bytes, out _);
@@ -43,8 +43,22 @@ public sealed class BridgeFrameTests
     [TestMethod]
     public void TryDecodeRejectsOversizedPayloadMarker()
     {
-        byte[] bytes = new BridgeFrame(BridgeCommand.Ping, Sequence: 1, []).Encode();
+        byte[] bytes = new BridgeFrame(BridgeCommand.HidInput, Sequence: 1, []).Encode();
         bytes[6] = BridgeFrame.MaxPayloadLength + 1;
+
+        bool decoded = BridgeFrame.TryDecode(bytes, out _);
+
+        Assert.IsFalse(decoded);
+    }
+
+    [TestMethod]
+    public void TryDecodeRejectsUnknownCommand()
+    {
+        byte[] bytes = new BridgeFrame(BridgeCommand.HidInput, Sequence: 1, []).Encode();
+        bytes[4] = 0xff;
+        ushort checksum = Checksum16.Compute(bytes.AsSpan(0, bytes.Length - BridgeFrame.ChecksumSize));
+        bytes[^2] = (byte)checksum;
+        bytes[^1] = (byte)(checksum >> 8);
 
         bool decoded = BridgeFrame.TryDecode(bytes, out _);
 
@@ -54,7 +68,7 @@ public sealed class BridgeFrameTests
     [TestMethod]
     public void TryWriteEncodesIntoCallerProvidedBuffer()
     {
-        BridgeFrame source = new(BridgeCommand.Ping, Sequence: 2, []);
+        BridgeFrame source = new(BridgeCommand.HidInput, Sequence: 2, []);
         Span<byte> buffer = stackalloc byte[BridgeFrame.HeaderSize + BridgeFrame.ChecksumSize];
 
         bool encoded = source.TryWrite(buffer, out int bytesWritten);

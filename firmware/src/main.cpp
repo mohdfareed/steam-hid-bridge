@@ -1,25 +1,18 @@
 #include <Arduino.h>
 
-static const uint32_t kStatusIntervalMs = 1000;
-static uint32_t lastStatusMs = 0;
+// put function declarations here:
+int myFunction(int, int);
 
-void setup()
-{
-    Serial.begin(115200);
-    pinMode(LED_BUILTIN, OUTPUT);
+void setup() {
+  // put your setup code here, to run once:
+  int result = myFunction(2, 3);
 }
 
-void loop()
-{
-    const uint32_t now = millis();
-    if (now - lastStatusMs >= kStatusIntervalMs)
-    {
-        lastStatusMs = now;
-        digitalWrite(LED_BUILTIN, !digitalRead(LED_BUILTIN));
+void loop() {
+  // put your main code here, to run repeatedly:
+}
 
-        if (Serial)
-        {
-            Serial.println("steam-hid-bridge firmware placeholder: waiting for transport implementation");
-        }
-    }
+// put function definitions here:
+int myFunction(int x, int y) {
+  return x + y;
 }

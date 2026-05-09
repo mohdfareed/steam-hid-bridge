@@ -23,6 +23,6 @@ PlatformIO must be installed separately. Until hardware arrives, this directory 
 - Emit keyboard and mouse HID reports.
 - Keep the hot path small and allocation-free.
 - Keep diagnostics separate from HID emission.
-- Provide visible recoverable failure states for bad frames, disconnects, and reset commands.
+- Provide visible recoverable failure states for bad frames and disconnects.
 
 The firmware must not implement Steam Input behavior, controller interpretation, game-specific behavior, anti-cheat bypasses, or privileged host behavior.

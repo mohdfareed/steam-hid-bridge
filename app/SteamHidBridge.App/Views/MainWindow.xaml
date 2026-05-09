@@ -6,6 +6,7 @@
         xmlns:views="clr-namespace:SteamHidBridge.App.Views"
         mc:Ignorable="d"
         Title="Steam HID Bridge"
+        Icon="/Assets/SteamHidBridge.ico"
         Width="980"
         Height="620"
         MinWidth="860"
@@ -29,13 +30,10 @@
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <DockPanel Margin="0,0,0,20">
-            <StackPanel DockPanel.Dock="Left">
-                <TextBlock Text="Steam HID Bridge" FontSize="28" FontWeight="SemiBold" />
-                <TextBlock Text="{Binding ProfileText}" Margin="0,5,0,0" Foreground="#5A6878" />
-            </StackPanel>
+        <DockPanel Margin="0,0,0,16" LastChildFill="True">
             <Border DockPanel.Dock="Right"
                     Padding="12,7"
+                    Margin="24,0,0,0"
                     BorderBrush="#B8C4D0"
                     BorderThickness="1"
                     CornerRadius="4"
@@ -50,6 +48,10 @@
                     <TextBlock Text="{Binding ForwardingStatus}" FontWeight="SemiBold" VerticalAlignment="Center" />
                 </StackPanel>
             </Border>
+            <StackPanel>
+                <TextBlock Text="Steam HID Bridge" FontSize="28" FontWeight="SemiBold" />
+                <TextBlock Text="{Binding ProfileText}" Margin="0,1,0,0" Foreground="#5A6878" />
+            </StackPanel>
         </DockPanel>
 
         <Grid Grid.Row="1">

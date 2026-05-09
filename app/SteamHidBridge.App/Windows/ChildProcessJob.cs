@@ -33,7 +33,10 @@ public sealed partial class ChildProcessJob : IDisposable
             ref info,
             Marshal.SizeOf<JobObjectExtendedLimitInformation>()))
         {
-            throw new Win32Exception(Marshal.GetLastPInvokeError(), "Could not configure child process job.");
+            int error = Marshal.GetLastPInvokeError();
+            _ = CloseHandle(handle);
+            handle = IntPtr.Zero;
+            throw new Win32Exception(error, "Could not configure child process job.");
         }
     }
 

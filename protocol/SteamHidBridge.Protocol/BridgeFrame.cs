@@ -60,7 +60,9 @@ public readonly record struct BridgeFrame(BridgeCommand Command, byte Sequence, 
         }
 
         int payloadLength = data[6];
-        if (payloadLength > MaxPayloadLength || data.Length != HeaderSize + payloadLength + ChecksumSize)
+        if (data[4] != (byte)BridgeCommand.HidInput ||
+            payloadLength > MaxPayloadLength ||
+            data.Length != HeaderSize + payloadLength + ChecksumSize)
         {
             return false;
         }

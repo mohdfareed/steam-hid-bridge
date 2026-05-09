@@ -18,7 +18,7 @@ The bridge MVP covers:
 - Mouse HID output, including pointer movement, left/right/middle buttons, two side buttons, and vertical wheel.
 - A host-to-device protocol with explicit validation and visible recoverable failures.
 
-Target games should not need to be added to Steam directly, and they should not need to be launched through Steam. The user launches the bridge shortcut from Steam, then launches the target game normally.
+Target games should not need to be added to Steam directly, and they should not need to be launched through Steam. In `--launch` mode, the bridge launches the configured target executable as a normal child process while Steam tracks the bridge process.
 
 Do not build around Steam Desktop Configuration. Do not require manual Steam Desktop config switching. Do not add controller interpretation, gameplay automation, privileged hooks, anti-cheat bypasses, kernel drivers, or game-specific behavior.
 
@@ -87,15 +87,21 @@ Use current official documentation for platform APIs, libraries, and tooling.
 
 - `.slnx` solution format.
 - Current stable .NET project files with latest C# language selection and explicit usings.
-- WPF shell with editable game settings, profile startup, optional target launch, foreground receiver gate, loopback transport, output preview, and diagnostics.
+- WPF shell with editable game settings, profile startup, optional target launch, foreground receiver gate, Steam config forcing, and output preview.
 - Launch mode (`--launch`) starts the configured target, keeps the bridge UI hidden behind a tray icon, and shows only a transparent Steam overlay host window. The current tray behavior is per bridge process; do not add a shared tray host or cross-process instance list without an explicit IPC decision.
 - If the bridge starts a target process, it owns that process lifetime. Steam stopping the bridge should close the launched process tree, and the bridge should exit when the launched receiver exits.
-- Closing the status window hides it back to the tray. The app exits only through the tray Exit command, launched receiver exit, or Steam/process termination.
+- In normal interactive mode, closing the status window exits the app. In `--launch` mode, closing the status window hides it back to the tray. Launch-mode instances exit through the tray Exit command, launched receiver exit, or Steam/process termination.
 - Multiple instances may save `appsettings.json`; writes must use the settings-store mutex and atomic write path so profile saves merge with the latest file contents.
-- Output is always previewed in the app model and is only forwarded when a configured receiver process is the foreground process. Do not add manual output-destination modes for v1.
+- Output is always previewed in the app model. When real Steam Input and Teensy transport are added, forwarding must only run while a configured receiver process is the foreground process. Do not add manual output-destination modes for v1.
 - Steam ROM Manager export should generate bridge-targeted shortcuts, not game-targeted shortcuts. Each generated entry should launch the bridge with `--profile <id> --launch`; the selected profile then launches the configured game executable.
+- Do not inject a synthetic `default` profile. If no profile is requested, select an existing profile; create a local `new-game` entry only when there are no profiles loaded.
+- Publish output should be self-contained for the selected Windows runtime unless the user asks for framework-dependent deployment.
+- Release tags use `vMAJOR.MINOR.PATCH`, for example `v0.1.1`. Tag pushes matching that shape build, test, package, and create a GitHub Release with `SteamHidBridge-win-x64.zip`.
+- The installer script lives at `scripts/install.ps1`, downloads from GitHub Releases, preserves existing `appsettings.json`, and creates a Desktop shortcut.
+- App updates use GitHub Releases. The app checks the latest release, asks for confirmation, launches `update.ps1`, closes all bridge instances, preserves `appsettings.json`, and replaces the published app folder. Do not make the running process overwrite its own executable directly.
+- Steam Input config forcing uses Steam's official `steam://forceinputappid/<appid>` URL only while the configured receiver is foreground, and resets with `steam://forceinputappid/0` when foreground is lost or the bridge exits.
 - Steam Input integration belongs under `app/SteamHidBridge.App/Steam/`. Keep the real Steamworks API reader isolated there; do not let WPF focus state drive input capture.
-- Shared C# protocol library for frame encoding, validation, and HID report payloads.
+- Shared C# protocol library for frame encoding, validation, and the HID input payload.
 - MSTest protocol tests for synthetic input and malformed-frame handling.
 - PlatformIO firmware placeholder for Teensy 4.0.
 - Build, test, and publish scripts under `scripts/`.
@@ -137,6 +143,6 @@ The project should include synthetic input tests for protocol and HID mapping be
 
 Latency-sensitive behavior should be measured, not inferred.
 
-Do not display or document latency numbers from loopback-only validation as real device latency. Real latency requires measurement across the host transport and firmware HID emission path.
+Do not display or document synthetic-only latency numbers as real device latency. Real latency requires measurement across the host transport and firmware HID emission path.
 
 Failures should be visible and recoverable without requiring firmware re-flashing.

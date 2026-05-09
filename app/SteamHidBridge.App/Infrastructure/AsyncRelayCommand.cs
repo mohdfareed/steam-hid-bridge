@@ -29,6 +29,10 @@ public sealed class AsyncRelayCommand(Func<Task> execute, Func<bool>? canExecute
         {
             await execute();
         }
+        catch (Exception ex)
+        {
+            AppLog.WriteException("command-failed", ex);
+        }
         finally
         {
             isExecuting = false;

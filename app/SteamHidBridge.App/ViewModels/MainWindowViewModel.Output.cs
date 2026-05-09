@@ -1,42 +1,12 @@
-using System.Threading;
-using System.Threading.Tasks;
-using SteamHidBridge.App.Transport;
 using SteamHidBridge.Protocol;
 
 namespace SteamHidBridge.App.ViewModels;
 
 public sealed partial class MainWindowViewModel
 {
-    private async Task HandleOutputAsync(HidInputReport report, string source)
+    private void PreviewOutput(HidInputReport report)
     {
         SetLastReport(report);
-        framesPreviewed++;
-        FramesPreviewedText = framesPreviewed.ToString();
-
-        if (!isForwardingActive)
-        {
-            framesBlocked++;
-            FramesBlockedText = framesBlocked.ToString();
-            AddLog($"Previewed {source}; receiver is not active.");
-            return;
-        }
-
-        byte[] payload = new byte[HidInputReport.WireSize];
-        report.WriteTo(payload);
-        BridgeTransportResult result = await transport.SendAsync(new BridgeFrame(BridgeCommand.HidInput, sequence++, payload), CancellationToken.None);
-
-        if (result.Accepted)
-        {
-            framesForwarded++;
-            FramesForwardedText = framesForwarded.ToString();
-        }
-        else
-        {
-            framesBlocked++;
-            FramesBlockedText = framesBlocked.ToString();
-        }
-
-        AddLog($"{(result.Accepted ? "Forwarded" : "Rejected")} {source}: {result.Detail}");
     }
 
     private void SetLastReport(HidInputReport report)

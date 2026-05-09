@@ -1,6 +1,7 @@
 param(
     [string]$Configuration = "Release",
-    [string]$Runtime = "win-x64"
+    [string]$Runtime = "win-x64",
+    [string]$Version = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -11,11 +12,21 @@ if (Test-Path $output) {
     Remove-Item -LiteralPath $output -Recurse -Force
 }
 
-dotnet publish "$root\app\SteamHidBridge.App\SteamHidBridge.App.csproj" `
-    --configuration $Configuration `
-    --runtime $Runtime `
-    --self-contained false `
-    --output $output
+$publishArgs = @(
+    "publish",
+    "$root\app\SteamHidBridge.App\SteamHidBridge.App.csproj",
+    "--configuration", $Configuration,
+    "--runtime", $Runtime,
+    "--self-contained", "true",
+    "--output", $output
+)
+
+if (-not [string]::IsNullOrWhiteSpace($Version)) {
+    $publishArgs += "-p:Version=$Version"
+    $publishArgs += "-p:InformationalVersion=$Version"
+}
+
+dotnet @publishArgs
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 Write-Host "Published to $output"

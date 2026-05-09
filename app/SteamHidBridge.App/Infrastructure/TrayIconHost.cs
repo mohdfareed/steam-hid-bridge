@@ -10,6 +10,7 @@ public sealed class TrayIconHost : IDisposable
 {
     private readonly MainWindow window;
     private readonly Action exit;
+    private readonly Drawing.Icon icon;
     private readonly Forms.NotifyIcon notifyIcon;
     private bool disposed;
 
@@ -24,9 +25,10 @@ public sealed class TrayIconHost : IDisposable
         _ = menu.Items.Add(new Forms.ToolStripSeparator());
         _ = menu.Items.Add(new Forms.ToolStripMenuItem("Exit", null, (_, _) => this.exit()));
 
+        icon = LoadIcon();
         notifyIcon = new Forms.NotifyIcon
         {
-            Icon = Drawing.SystemIcons.Application,
+            Icon = icon,
             Text = BuildText(profileId),
             ContextMenuStrip = menu,
             Visible = true
@@ -60,7 +62,22 @@ public sealed class TrayIconHost : IDisposable
 
         notifyIcon.Visible = false;
         notifyIcon.Dispose();
+        icon.Dispose();
         disposed = true;
+    }
+
+    private static Drawing.Icon LoadIcon()
+    {
+        if (!string.IsNullOrWhiteSpace(Environment.ProcessPath))
+        {
+            Drawing.Icon? extractedIcon = Drawing.Icon.ExtractAssociatedIcon(Environment.ProcessPath);
+            if (extractedIcon is not null)
+            {
+                return extractedIcon;
+            }
+        }
+
+        return (Drawing.Icon)Drawing.SystemIcons.Application.Clone();
     }
 
     private static string BuildText(string profileId)

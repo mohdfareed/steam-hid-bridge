@@ -6,7 +6,6 @@ using System.Windows.Threading;
 using SteamHidBridge.App.Infrastructure;
 using SteamHidBridge.App.Profiles;
 using SteamHidBridge.App.Startup;
-using SteamHidBridge.App.Transport;
 using SteamHidBridge.App.ViewModels;
 using SteamHidBridge.App.Views;
 
@@ -19,6 +18,8 @@ public partial class App : Application
     private TrayIconHost? trayIconHost;
     private MainWindowViewModel? mainWindowViewModel;
     private SteamOverlayHostWindow? overlayHostWindow;
+    private ShutdownSignalListener? shutdownSignalListener;
+    private bool hideMainWindowToTrayOnClose;
     private bool isExiting;
 
     public App()
@@ -35,16 +36,15 @@ public partial class App : Application
             AppLog.Write($"startup args=[{string.Join(" ", e.Args.Select(arg => "\"" + arg + "\""))}] base={AppContext.BaseDirectory}");
 
             BridgeLaunchOptions launchOptions = BridgeLaunchOptions.Parse(e.Args);
-            AppLog.Write($"launch-options profile={launchOptions.ProfileId} launchGame={launchOptions.LaunchGame}");
+            hideMainWindowToTrayOnClose = launchOptions.LaunchGame;
+            AppLog.Write($"launch-options profile={launchOptions.ProfileId} launchGame={launchOptions.LaunchGame} steamAppId={launchOptions.SteamAppId}");
 
             AppSettingsStore settingsStore = AppSettingsStore.LoadDefault();
-            AppLog.Write($"settings loaded path={settingsStore.Path}");
+            AppLog.Write($"settings loaded path={settingsStore.FilePath}");
 
-            mainWindowViewModel = new MainWindowViewModel(
-                launchOptions,
-                settingsStore,
-                new LoopbackBridgeTransport());
+            mainWindowViewModel = new MainWindowViewModel(launchOptions, settingsStore);
             mainWindowViewModel.ExitRequested += ExitApplication;
+            shutdownSignalListener = new ShutdownSignalListener(() => Dispatcher.BeginInvoke(() => ExitApplication(0)));
 
             MainWindow window = new()
             {
@@ -55,7 +55,7 @@ public partial class App : Application
             window.Closed += (_, _) => AppLog.Write("main-window closed");
             MainWindow = window;
 
-            trayIconHost = new TrayIconHost(window, launchOptions.ProfileId, () => ExitApplication(0));
+            trayIconHost = new TrayIconHost(window, mainWindowViewModel.SelectedGameId, () => ExitApplication(0));
             if (launchOptions.LaunchGame)
             {
                 overlayHostWindow = new SteamOverlayHostWindow();
@@ -79,9 +79,11 @@ public partial class App : Application
     protected override void OnExit(ExitEventArgs e)
     {
         isExiting = true;
+        mainWindowViewModel?.ResetSteamInputConfig();
         mainWindowViewModel?.StopLaunchedProcesses();
         overlayHostWindow?.Close();
         trayIconHost?.Dispose();
+        shutdownSignalListener?.Dispose();
         AppLog.Write($"exit code={e.ApplicationExitCode}");
         base.OnExit(e);
     }
@@ -90,6 +92,13 @@ public partial class App : Application
     {
         if (isExiting)
         {
+            return;
+        }
+
+        if (!hideMainWindowToTrayOnClose)
+        {
+            isExiting = true;
+            AppLog.Write("main-window close requested; exiting interactive app");
             return;
         }
 

@@ -1,8 +1,14 @@
 using System;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
+using System.Runtime.InteropServices;
+using System.Text.Json;
 using System.Threading.Tasks;
+using SteamHidBridge.App.Infrastructure;
 using SteamHidBridge.App.Profiles;
+using SteamHidBridge.App.Windows;
 
 namespace SteamHidBridge.App.ViewModels;
 
@@ -13,7 +19,7 @@ public sealed partial class MainWindowViewModel
         string gameId = CreateUniqueGameId();
         settingsStore.Document.Games[gameId] = new GameProfile();
         ReloadGameIds(gameId);
-        AddLog($"Created {gameId}.");
+        SetActivity($"Created {gameId}.");
         return Task.CompletedTask;
     }
 
@@ -21,19 +27,23 @@ public sealed partial class MainWindowViewModel
     {
         if (string.IsNullOrWhiteSpace(EditGameId))
         {
-            AddLog("Cannot save without an id.");
+            SetActivity("Cannot save without an id.");
             return Task.CompletedTask;
         }
 
         string newId = EditGameId.Trim();
-        if (!string.Equals(selectedGameId, newId, StringComparison.OrdinalIgnoreCase))
+        try
         {
-            _ = settingsStore.Document.Games.Remove(selectedGameId);
+            settingsStore.SaveGame(selectedGameId, newId, ReadEditorProfile());
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException or InvalidOperationException)
+        {
+            SetActivity($"Save failed: {ex.Message}");
+            return Task.CompletedTask;
         }
 
-        settingsStore.SaveGame(selectedGameId, newId, ReadEditorProfile());
         ReloadGameIds(newId);
-        AddLog($"Saved {newId}.");
+        SetActivity($"Saved {newId}.");
         return Task.CompletedTask;
     }
 
@@ -42,13 +52,19 @@ public sealed partial class MainWindowViewModel
         GameProfile profile = ReadEditorProfile();
         if (string.IsNullOrWhiteSpace(profile.Executable))
         {
-            AddLog("No executable configured.");
+            SetActivity("No executable configured.");
             return Task.CompletedTask;
         }
 
         if (!File.Exists(profile.Executable))
         {
-            AddLog($"Executable not found: {profile.Executable}");
+            SetActivity($"Executable not found: {profile.Executable}");
+            return Task.CompletedTask;
+        }
+
+        if (launchedProcess is { HasExited: false })
+        {
+            SetActivity("A launched process is already running.");
             return Task.CompletedTask;
         }
 
@@ -68,16 +84,16 @@ public sealed partial class MainWindowViewModel
 
             if (process is null)
             {
-                AddLog("Launch failed: process was not created.");
+                SetActivity("Launch failed: process was not created.");
                 return Task.CompletedTask;
             }
 
             TrackLaunchedProcess(process);
-            AddLog($"Launched {selectedGameId}.");
+            SetActivity($"Launched {selectedGameId}.");
         }
-        catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception)
+        catch (Exception ex) when (ex is InvalidOperationException or Win32Exception)
         {
-            AddLog($"Launch failed: {ex.Message}");
+            SetActivity($"Launch failed: {ex.Message}");
         }
 
         return Task.CompletedTask;
@@ -88,13 +104,22 @@ public sealed partial class MainWindowViewModel
         string executable = Environment.ProcessPath ?? string.Empty;
         if (string.IsNullOrWhiteSpace(executable))
         {
-            AddLog("Could not find bridge executable path.");
+            SetActivity("Could not find bridge executable path.");
             return Task.CompletedTask;
         }
 
         string json = SteamRomManagerExport.CreateJson(settingsStore.Document.Games, executable);
-        System.Windows.Clipboard.SetText(json);
-        AddLog($"Copied Steam ROM Manager JSON for {settingsStore.Document.Games.Count} profile(s).");
+        try
+        {
+            System.Windows.Clipboard.SetText(json);
+        }
+        catch (Exception ex) when (ex is ExternalException or InvalidOperationException)
+        {
+            SetActivity($"Could not copy Steam ROM Manager JSON: {ex.Message}");
+            return Task.CompletedTask;
+        }
+
+        SetActivity($"Copied Steam ROM Manager JSON for {settingsStore.Document.Games.Count} profile(s).");
         return Task.CompletedTask;
     }
 
@@ -107,19 +132,20 @@ public sealed partial class MainWindowViewModel
         {
             if (launchedProcess is { HasExited: false } process)
             {
-                AddLog($"Stopping launched process {process.Id}.");
+                SetActivity($"Stopping launched process {process.Id}.");
                 process.Kill(entireProcessTree: true);
             }
         }
-        catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception)
+        catch (Exception ex) when (ex is InvalidOperationException or Win32Exception)
         {
-            AddLog($"Could not stop launched process: {ex.Message}");
+            SetActivity($"Could not stop launched process: {ex.Message}");
         }
         finally
         {
             launchedProcess?.Dispose();
             launchedProcess = null;
-            childProcessJob.Dispose();
+            childProcessJob?.Dispose();
+            childProcessJob = null;
         }
     }
 
@@ -134,21 +160,36 @@ public sealed partial class MainWindowViewModel
         process.Exited += (_, _) =>
         {
             launchedProcessExited = true;
-            _ = statusTimer.Dispatcher.BeginInvoke(() => AddLog($"Launched process exited: {process.Id}"));
+            _ = statusTimer.Dispatcher.BeginInvoke(() => SetActivity($"Launched process exited: {process.Id}"));
         };
 
-        if (childProcessJob.TryAdd(process))
+        if (TryTrackProcessTree(process))
         {
-            AddLog($"Tracking launched process tree: {process.Id}");
+            AppLog.Write($"tracking launched process tree={process.Id}");
         }
         else
         {
-            AddLog($"Tracking launched process directly only: {process.Id}");
+            AppLog.Write($"tracking launched process directly={process.Id}");
         }
     }
 
-    private void ReloadGameIds(string selectedId)
+    private bool TryTrackProcessTree(Process process)
     {
+        try
+        {
+            childProcessJob ??= new ChildProcessJob();
+            return childProcessJob.TryAdd(process);
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or Win32Exception)
+        {
+            AppLog.WriteException("child-process-job-unavailable", ex);
+            return false;
+        }
+    }
+
+    private void ReloadGameIds(string requestedId)
+    {
+        string selectedId = ResolveSelectedGameId(requestedId);
         if (!settingsStore.Document.Games.TryGetValue(selectedId, out GameProfile? selectedProfile))
         {
             selectedProfile = new GameProfile();
@@ -156,13 +197,28 @@ public sealed partial class MainWindowViewModel
         }
 
         GameIds.Clear();
-        foreach (string gameId in settingsStore.Document.Games.Keys)
+        foreach (string gameId in settingsStore.Document.Games.Keys.Order(StringComparer.OrdinalIgnoreCase))
         {
             GameIds.Add(gameId);
         }
 
-        SelectedGameId = selectedId;
         LoadEditor(selectedId, selectedProfile);
+    }
+
+    private string ResolveSelectedGameId(string requestedId)
+    {
+        requestedId = requestedId.Trim();
+        if (!string.IsNullOrWhiteSpace(requestedId))
+        {
+            return requestedId;
+        }
+
+        foreach (string gameId in settingsStore.Document.Games.Keys.Order(StringComparer.OrdinalIgnoreCase))
+        {
+            return gameId;
+        }
+
+        return "new-game";
     }
 
     private void LoadEditor(string gameId, GameProfile profile)

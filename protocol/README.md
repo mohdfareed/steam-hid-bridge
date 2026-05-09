@@ -12,12 +12,9 @@ byte 7..n   payload
 last 2      little-endian additive checksum over header + payload
 ```
 
-Commands:
+Command:
 
-- `0x01` ping
 - `0x10` HID input
-- `0x20` reset
-- `0x30` diagnostics
 
 The first HID input payload covers the keyboard and mouse MVP:
 

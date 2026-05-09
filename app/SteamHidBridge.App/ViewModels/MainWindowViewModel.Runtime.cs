@@ -16,22 +16,17 @@ public sealed partial class MainWindowViewModel
         string[] receiverProcesses = ReceiverProcesses;
         string foregroundProcess = WindowsRuntime.GetForegroundProcessName();
 
-        ForegroundStatus = string.IsNullOrWhiteSpace(foregroundProcess)
-            ? "Foreground: n/a"
-            : $"Foreground: {foregroundProcess}";
-
         if (receiverProcesses.Length == 0)
         {
-            ReceiverStatus = "No receiver process configured";
             ForwardingStatus = "Preview only";
             UpdateForwardingActive(false);
+            UpdateSteamInputConfigForce(false);
             if (launchOptions.LaunchGame && launchedProcess is not null && launchedProcessExited)
             {
-                AddLog("Launched process exited; closing bridge.");
+                SetActivity("Launched process exited; closing bridge.");
                 RequestExit(0);
             }
 
-            OnPropertyChanged(nameof(SteamInputStatusText));
             return;
         }
 
@@ -43,20 +38,20 @@ public sealed partial class MainWindowViewModel
 
         if (launchOptions.LaunchGame && hasSeenReceiverProcess && !receiverRunning)
         {
-            AddLog("Receiver process exited; closing bridge.");
+            SetActivity("Receiver process exited; closing bridge.");
             RequestExit(0);
             return;
         }
 
-        bool receiverForeground = IsReceiverProcess(foregroundProcess);
-        ReceiverStatus = receiverRunning ? "Receiver running" : "Receiver not running";
-        ForwardingStatus = receiverForeground ? "Forwarding to foreground receiver" : "Preview only; waiting for receiver foreground";
-        UpdateForwardingActive(receiverRunning && receiverForeground);
-        OnPropertyChanged(nameof(SteamInputStatusText));
+        bool receiverForeground = receiverRunning && IsReceiverProcess(foregroundProcess);
+        bool shouldForward = receiverRunning && receiverForeground;
+        ForwardingStatus = shouldForward ? "Forwarding to foreground receiver" : "Preview only";
+        UpdateForwardingActive(shouldForward);
+        UpdateSteamInputConfigForce(shouldForward);
 
         if (Steam.SteamInputReader.TryReadLatest(out HidInputReport report))
         {
-            _ = HandleOutputAsync(report, "Steam Input");
+            PreviewOutput(report);
         }
     }
 
@@ -69,6 +64,14 @@ public sealed partial class MainWindowViewModel
 
         isForwardingActive = value;
         OnPropertyChanged(nameof(StatusBrush));
+    }
+
+    private void UpdateSteamInputConfigForce(bool shouldForce)
+    {
+        if (steamInputConfigForcer.TrySetForced(shouldForce, out string message) && !string.IsNullOrWhiteSpace(message))
+        {
+            SetActivity(message);
+        }
     }
 
     private static string[] ParseReceiverProcesses(string value)

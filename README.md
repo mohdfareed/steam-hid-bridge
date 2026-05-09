@@ -1,38 +1,25 @@
 # Steam HID Bridge
 
-Steam HID Bridge forwards input produced by Steam Input to a dedicated USB HID device.
+Steam HID Bridge is a small Steam-launched Windows app plus a future Teensy HID firmware path. Steam Input remains the controller configuration layer; this project handles profile launch state, foreground gating, and eventually keyboard/mouse HID emission.
 
-The intended use is to preserve Steam Input as the source of controller configuration, including gyro behavior, sensitivity, curves, and layouts, while emitting the final input through a standard USB HID mouse/keyboard device.
+Current MVP status: the Windows tray app works for profile launch, target process lifetime, settings editing, output preview, and Steam ROM Manager export. Real Steam Input reading and Teensy output are the next implementation steps.
 
-## Architecture
-
-```text
-Steam shortcut -> Windows bridge -> Steam Input API -> USB transport -> Teensy firmware -> USB HID reports -> target game
-```
-
-## Components
+## Layout
 
 ```text
-firmware/   Teensy firmware
 app/        Windows bridge application
-protocol/   Host-device protocol
-docs/       Steam shortcut and spike notes
-tests/      Protocol and synthetic input tests
-scripts/    Development and test utilities
+protocol/   Host-device frame and HID report payloads
+firmware/   Teensy 4.0 placeholder firmware
+docs/       Steam shortcut and validation notes
+tests/      Protocol tests
+scripts/    Build, test, publish helpers
 ```
-
-## Hardware
-
-Target device:
-
-* Teensy 4.0
-* USB-A to Micro-USB data cable
 
 ## Build
 
 Prerequisites:
 
-- Latest stable .NET SDK that supports the project target framework.
+- Latest stable .NET SDK that supports the target framework.
 - PlatformIO CLI for firmware work.
 
 ```powershell
@@ -41,10 +28,29 @@ Prerequisites:
 .\scripts\publish.ps1
 ```
 
-Run the app during pre-hardware development:
+`publish.ps1` creates a self-contained Windows build under `artifacts/SteamHidBridge-win-x64`.
+`package-release.ps1` creates the release zip at `artifacts/SteamHidBridge-win-x64.zip`.
+
+## Install
+
+The release installer downloads the latest GitHub Release, asks for an install folder, copies the self-contained app there, creates `appsettings.json` from the example file when needed, and adds a Desktop shortcut.
 
 ```powershell
-dotnet run --project .\app\SteamHidBridge.App
+irm https://raw.githubusercontent.com/mohdfareed/steam-hid-bridge/main/scripts/install.ps1 | iex
+```
+
+Default install location:
+
+```text
+%LOCALAPPDATA%\Programs\SteamHidBridge
+```
+
+The app can check GitHub Releases for updates from its App section. Updating closes all bridge instances, preserves `appsettings.json`, and replaces the self-contained app folder with the latest release package.
+
+Run the app directly:
+
+```powershell
+dotnet run --project .\app\SteamHidBridge.App -- --profile valorant
 dotnet run --project .\app\SteamHidBridge.App -- --profile valorant --launch
 ```
 
@@ -54,10 +60,21 @@ Firmware build, once PlatformIO is installed:
 pio run -d .\firmware
 ```
 
-## Use
+## Steam Use
 
-1. Publish the Windows bridge.
-2. Put an `appsettings.json` next to the executable.
-3. Add one Steam shortcut per profile, passing `--profile <id> --launch`. The app can copy Steam ROM Manager manual-parser JSON for these shortcuts.
-4. Launch that shortcut from Steam.
-5. The bridge previews output and only forwards while the configured receiver process is foreground.
+1. Install or publish the Windows app.
+2. Start the app from the Desktop shortcut.
+3. Create game profiles.
+4. Copy the Steam ROM Manager JSON from the app and import it into Steam ROM Manager.
+5. Launch a generated Steam shortcut. The shortcut passes `--profile <id> --launch`.
+
+## Releases
+
+Push a tag like `v0.1.1` to build and publish a GitHub Release:
+
+```powershell
+git tag v0.1.1
+git push origin v0.1.1
+```
+
+The release workflow builds, tests, packages `SteamHidBridge-win-x64.zip`, and attaches it to the GitHub Release.

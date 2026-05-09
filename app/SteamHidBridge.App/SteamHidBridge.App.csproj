@@ -5,8 +5,19 @@
     <TargetFramework>net10.0-windows</TargetFramework>
     <Nullable>enable</Nullable>
     <UseWPF>true</UseWPF>
+    <!-- Required for System.Windows.Forms.NotifyIcon tray support. -->
     <UseWindowsForms>true</UseWindowsForms>
+    <!-- Required by LibraryImport-generated Win32 interop; app logic should not use unsafe blocks. -->
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <AssemblyName>SteamHidBridge</AssemblyName>
+    <ApplicationIcon>Assets\SteamHidBridge.ico</ApplicationIcon>
+    <AssemblyTitle>Steam HID Bridge</AssemblyTitle>
+    <Product>Steam HID Bridge</Product>
+    <Description>Launch game profiles from Steam and bridge Steam Input toward keyboard and mouse HID output.</Description>
+    <Company>mohdfareed</Company>
+    <Authors>mohdfareed</Authors>
+    <RepositoryUrl>https://github.com/mohdfareed/steam-hid-bridge</RepositoryUrl>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
   </PropertyGroup>
 
   <ItemGroup>
@@ -15,6 +26,11 @@
 
   <ItemGroup>
     <None Include="appsettings.example.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\scripts\update.ps1" Link="update.ps1" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="Assets\SteamHidBridge.ico" />
   </ItemGroup>
 
 </Project>
