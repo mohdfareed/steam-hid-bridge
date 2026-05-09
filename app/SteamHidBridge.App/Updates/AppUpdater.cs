@@ -58,27 +58,46 @@ public sealed class AppUpdater
         var tempScriptPath = Path.Combine(
             Path.GetTempPath(),
             $"SteamHidBridgeUpdate-{Guid.NewGuid():N}.ps1");
+        var tempCommandPath = Path.ChangeExtension(tempScriptPath, ".cmd");
+        var logPath = Path.Combine(Path.GetTempPath(), "SteamHidBridge-update.log");
 
         File.Copy(sourceScriptPath, tempScriptPath, overwrite: true);
 
         var installDir = Path.TrimEndingDirectorySeparator(AppContext.BaseDirectory);
-        var arguments = string.Join(
+        var powerShellArguments = string.Join(
             ' ',
             "-NoProfile",
-            "-ExecutionPolicy Bypass",
+            "-ExecutionPolicy",
+            "Bypass",
             "-File",
-            PowerShellQuote(tempScriptPath),
+            CommandLineQuote(tempScriptPath),
             "-PackageUrl",
-            PowerShellQuote(update.PackageUrl),
+            CommandLineQuote(update.PackageUrl),
             "-InstallDir",
-            PowerShellQuote(installDir),
+            CommandLineQuote(installDir),
             "-CurrentProcessId",
             Environment.ProcessId.ToString());
 
+        File.WriteAllText(
+            tempCommandPath,
+            $"""
+            @echo off
+            echo Steam HID Bridge updater
+            echo Log: {logPath}
+            echo.
+            powershell.exe {powerShellArguments} > {CommandLineQuote(logPath)} 2>&1
+            set UPDATE_EXIT_CODE=%ERRORLEVEL%
+            type {CommandLineQuote(logPath)}
+            echo.
+            echo Updater exit code: %UPDATE_EXIT_CODE%
+            echo.
+            pause
+            exit /b %UPDATE_EXIT_CODE%
+            """);
+
         Process.Start(new ProcessStartInfo
         {
-            FileName = "powershell.exe",
-            Arguments = arguments,
+            FileName = tempCommandPath,
             UseShellExecute = true,
             WindowStyle = ProcessWindowStyle.Normal
         });
@@ -134,9 +153,9 @@ public sealed class AppUpdater
         return new Version(version.Major, version.Minor, Math.Max(version.Build, 0));
     }
 
-    private static string PowerShellQuote(string value)
+    private static string CommandLineQuote(string value)
     {
-        return $"'{value.Replace("'", "''")}'";
+        return $"\"{value.Replace("\"", "\"\"")}\"";
     }
 
     private sealed class GitHubRelease
