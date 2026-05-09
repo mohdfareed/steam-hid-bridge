@@ -30,12 +30,9 @@ public readonly record struct HidInputReport(
 
     public static HidInputReport ReadFrom(ReadOnlySpan<byte> source)
     {
-        if (source.Length < WireSize)
-        {
-            throw new ArgumentException("Source is too small.", nameof(source));
-        }
-
-        return new HidInputReport(
+        return source.Length < WireSize
+            ? throw new ArgumentException("Source is too small.", nameof(source))
+            : new HidInputReport(
             BinaryPrimitives.ReadInt16LittleEndian(source),
             BinaryPrimitives.ReadInt16LittleEndian(source[2..]),
             unchecked((sbyte)source[4]),

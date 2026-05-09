@@ -2,18 +2,22 @@
   "version": "0.2",
   "words": [
     "AppID",
+    "appsettings",
     "CrSel",
     "ExSel",
     "GlosSI",
     "ISteamInput",
     "KeyValues",
+    "LASTEXITCODE",
     "MSTest",
     "SISR",
     "slnx",
+    "Steamworks",
     "SysReq",
     "Teensy",
     "Teensyduino",
     "TFM",
+    "valorant",
     "VDF",
     "Win32"
   ]

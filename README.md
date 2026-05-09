@@ -7,7 +7,7 @@ The intended use is to preserve Steam Input as the source of controller configur
 ## Architecture
 
 ```text
-Steam shortcut -> Windows bridge -> Steam Input -> USB transport -> Teensy firmware -> USB HID reports -> target game
+Steam shortcut -> Windows bridge -> Steam Input API -> USB transport -> Teensy firmware -> USB HID reports -> target game
 ```
 
 ## Components
@@ -45,7 +45,7 @@ Run the app during pre-hardware development:
 
 ```powershell
 dotnet run --project .\app\SteamHidBridge.App
-dotnet run --project .\app\SteamHidBridge.App -- --profile valorant
+dotnet run --project .\app\SteamHidBridge.App -- --profile valorant --launch
 ```
 
 Firmware build, once PlatformIO is installed:
@@ -56,8 +56,8 @@ pio run -d .\firmware
 
 ## Use
 
-1. Flash the firmware.
-2. Connect the device.
-3. Start the Windows bridge.
-4. Select the target application.
-5. Enable forwarding.
+1. Publish the Windows bridge.
+2. Put an `appsettings.json` next to the executable.
+3. Add one Steam shortcut per profile, passing `--profile <id> --launch`. The app can copy Steam ROM Manager manual-parser JSON for these shortcuts.
+4. Launch that shortcut from Steam.
+5. The bridge previews output and only forwards while the configured receiver process is foreground.

@@ -5,22 +5,9 @@ using SteamHidBridge.Protocol;
 
 namespace SteamHidBridge.App.Transport;
 
-public sealed class LoopbackBridgeTransport : IBridgeTransport
+public sealed class LoopbackBridgeTransport
 {
-    public string Name => "Loopback simulator";
-    public bool IsConnected { get; private set; }
-
-    public Task ConnectAsync(CancellationToken cancellationToken)
-    {
-        IsConnected = true;
-        return Task.CompletedTask;
-    }
-
-    public Task DisconnectAsync(CancellationToken cancellationToken)
-    {
-        IsConnected = false;
-        return Task.CompletedTask;
-    }
+    public static string Name => "Loopback simulator";
 
     public Task<BridgeTransportResult> SendAsync(BridgeFrame frame, CancellationToken cancellationToken)
     {

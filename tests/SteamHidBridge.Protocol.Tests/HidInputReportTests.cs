@@ -1,6 +1,5 @@
 using System;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
-using SteamHidBridge.Protocol;
 
 namespace SteamHidBridge.Protocol.Tests;
 
@@ -10,7 +9,7 @@ public sealed class HidInputReportTests
     [TestMethod]
     public void ReadFromReconstructsSyntheticMouseAndKeyboardReport()
     {
-        var expected = new HidInputReport(
+        HidInputReport expected = new(
             PointerDeltaX: short.MinValue,
             PointerDeltaY: short.MaxValue,
             VerticalWheel: -1,

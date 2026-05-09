@@ -1,0 +1,108 @@
+<UserControl x:Class="SteamHidBridge.App.Views.OutputView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <DockPanel Margin="0,0,0,14">
+            <Ellipse DockPanel.Dock="Left"
+                     Width="10"
+                     Height="10"
+                     Fill="{Binding StatusBrush}"
+                     Margin="0,0,8,0"
+                     VerticalAlignment="Center" />
+            <TextBlock Text="Output preview" FontWeight="SemiBold" VerticalAlignment="Center" />
+        </DockPanel>
+
+        <Grid Grid.Row="1" Margin="0,0,0,18">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="230" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <Grid Width="180" Height="280" HorizontalAlignment="Left">
+                <Border CornerRadius="72"
+                        Background="#FFFFFF"
+                        BorderBrush="#CAD2DC"
+                        BorderThickness="2" />
+                <Grid Margin="24,22,24,26">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="54" />
+                        <RowDefinition Height="34" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="44" />
+                    </Grid.RowDefinitions>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+
+                    <Border Background="{Binding MouseLeftBrush}"
+                            BorderBrush="#CAD2DC"
+                            BorderThickness="1,1,1,1"
+                            CornerRadius="44,0,0,0">
+                        <TextBlock Text="Left" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                    <Border Grid.Column="1"
+                            Background="{Binding MouseRightBrush}"
+                            BorderBrush="#CAD2DC"
+                            BorderThickness="0,1,1,1"
+                            CornerRadius="0,44,0,0">
+                        <TextBlock Text="Right" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                    <Border Grid.Row="1"
+                            Grid.ColumnSpan="2"
+                            Width="32"
+                            Background="{Binding MouseMiddleBrush}"
+                            BorderBrush="#CAD2DC"
+                            BorderThickness="1"
+                            CornerRadius="10"
+                            HorizontalAlignment="Center">
+                        <TextBlock Text="M" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                    <StackPanel Grid.Row="3" Grid.ColumnSpan="2" Orientation="Horizontal" HorizontalAlignment="Center">
+                        <Border Width="54"
+                                Height="28"
+                                Margin="0,0,8,0"
+                                Background="{Binding MouseBackBrush}"
+                                BorderBrush="#CAD2DC"
+                                BorderThickness="1"
+                                CornerRadius="4">
+                            <TextBlock Text="Back" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <Border Width="70"
+                                Height="28"
+                                Background="{Binding MouseForwardBrush}"
+                                BorderBrush="#CAD2DC"
+                                BorderThickness="1"
+                                CornerRadius="4">
+                            <TextBlock Text="Forward" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                    </StackPanel>
+                </Grid>
+            </Grid>
+
+            <StackPanel Grid.Column="1" VerticalAlignment="Top">
+                <TextBlock Text="{Binding PointerText}" FontFamily="Consolas" FontSize="15" />
+                <TextBlock Text="{Binding WheelText}" FontFamily="Consolas" FontSize="15" Margin="0,8,0,0" />
+                <TextBlock Text="{Binding MouseButtonsText}" FontFamily="Consolas" FontSize="15" Margin="0,8,0,0" />
+                <TextBlock Text="{Binding KeyboardText}" FontFamily="Consolas" FontSize="15" Margin="0,8,0,0" />
+            </StackPanel>
+        </Grid>
+
+        <Border Grid.Row="2"
+                Padding="10"
+                Background="#FFFFFF"
+                BorderBrush="#D7DCE2"
+                BorderThickness="1">
+            <TextBlock Text="{Binding LastOutputText}"
+                       TextWrapping="Wrap"
+                       FontFamily="Consolas"
+                       FontSize="13" />
+        </Border>
+    </Grid>
+</UserControl>

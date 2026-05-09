@@ -1,6 +1,5 @@
 using System;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
-using SteamHidBridge.Protocol;
 
 namespace SteamHidBridge.Protocol.Tests;
 
@@ -11,7 +10,7 @@ public sealed class BridgeFrameTests
     public void EncodeDecodeRoundTripPreservesCommandSequenceAndPayload()
     {
         byte[] payload = new byte[HidInputReport.WireSize];
-        var report = new HidInputReport(
+        HidInputReport report = new(
             PointerDeltaX: 42,
             PointerDeltaY: -7,
             VerticalWheel: 1,
@@ -20,7 +19,7 @@ public sealed class BridgeFrameTests
             KeyboardUsageId: 0);
         report.WriteTo(payload);
 
-        var source = new BridgeFrame(BridgeCommand.HidInput, Sequence: 9, payload);
+        BridgeFrame source = new(BridgeCommand.HidInput, Sequence: 9, payload);
 
         bool decoded = BridgeFrame.TryDecode(source.Encode(), out BridgeFrame frame);
 
@@ -55,7 +54,7 @@ public sealed class BridgeFrameTests
     [TestMethod]
     public void TryWriteEncodesIntoCallerProvidedBuffer()
     {
-        var source = new BridgeFrame(BridgeCommand.Ping, Sequence: 2, []);
+        BridgeFrame source = new(BridgeCommand.Ping, Sequence: 2, []);
         Span<byte> buffer = stackalloc byte[BridgeFrame.HeaderSize + BridgeFrame.ChecksumSize];
 
         bool encoded = source.TryWrite(buffer, out int bytesWritten);

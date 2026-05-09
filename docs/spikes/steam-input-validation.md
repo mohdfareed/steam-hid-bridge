@@ -12,7 +12,12 @@ The next implementation work should prove Steam runtime behavior before building
 - [ ] Add a second Steam shortcut pointing to the same executable with a different `--profile`.
 - [ ] Confirm each shortcut retains a distinct Steam Input configuration.
 - [ ] Confirm command-line arguments identify the intended profile.
-- [ ] Confirm the single-instance guard prevents two bridge processes from owning output at the same time.
+- [ ] Confirm multiple bridge processes can run at the same time without breaking Steam Play/Stop state.
+- [ ] Confirm `--launch` mode can stay hidden in the tray while Steam still tracks the bridge process as Running.
+- [ ] Confirm the transparent overlay host keeps the per-shortcut Steam Input profile active while the receiver game is foreground.
+- [ ] If touch/radial menus or Steam overlay do not appear, test continuous drawing on the overlay host.
+- [ ] Confirm foreground receiver gating prevents inactive bridge processes from forwarding output.
+- [ ] Confirm whether Steam overlay attaches only to the bridge window or can follow a target launched by the bridge.
 - [ ] Confirm whether `SteamAPI_Init` succeeds for this shortcut mode without a published bridge AppID.
 - [ ] If `SteamAPI_Init` succeeds, confirm `ISteamInput::Init`, action manifest setup, action handles, `RunFrame`, `GetConnectedControllers`, `GetAnalogActionData`, and `GetDigitalActionData`.
 - [ ] Confirm an `absolute_mouse` analog action returns usable x/y deltas.

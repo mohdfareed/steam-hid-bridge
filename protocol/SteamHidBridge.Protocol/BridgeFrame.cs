@@ -17,13 +17,8 @@ public readonly record struct BridgeFrame(BridgeCommand Command, byte Sequence, 
 
     public byte[] Encode()
     {
-        var buffer = new byte[WireSize];
-        if (!TryWrite(buffer, out _))
-        {
-            throw new InvalidOperationException("Frame could not be encoded.");
-        }
-
-        return buffer;
+        byte[] buffer = new byte[WireSize];
+        return TryWrite(buffer, out _) ? buffer : throw new InvalidOperationException("Frame could not be encoded.");
     }
 
     public bool TryWrite(Span<byte> destination, out int bytesWritten)

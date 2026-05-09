@@ -13,10 +13,9 @@ Codex manages this `AGENTS.md` file as the living project instruction file. Keep
 The bridge MVP covers:
 
 - The bridge app as the Steam-launched application.
-- One Steam shortcut per target profile, each pointing to the same bridge executable with a `--profile <id>` argument.
+- One Steam shortcut per target profile, each pointing to the same bridge executable with a `--profile <id>` argument. Use `--launch` when the bridge should start the configured target executable.
 - Keyboard HID output.
 - Mouse HID output, including pointer movement, left/right/middle buttons, two side buttons, and vertical wheel.
-- A Windows host app that can be configured to start automatically.
 - A host-to-device protocol with explicit validation and visible recoverable failures.
 
 Target games should not need to be added to Steam directly, and they should not need to be launched through Steam. The user launches the bridge shortcut from Steam, then launches the target game normally.
@@ -52,6 +51,8 @@ Use current official Microsoft tooling and formats for new C# work. Prefer the l
 
 Do not enable C# implicit usings. Keep dependencies explicit and visible.
 
+C# analyzer suggestion categories are build warnings through `.editorconfig`. Prefer category-level warning policy over individual diagnostic IDs, and do not promote these warnings to errors by default. Apply analyzer suggestions instead of leaving suggestion squiggles for later unless the suggestion would make the code worse for this MVP and is explicitly suppressed with a narrow reason.
+
 Do not add `global.json` by default. Let the .NET CLI use the latest installed compatible SDK unless the project later needs a documented reproducible-build or CI reason to pin an SDK.
 
 Do not pin NuGet package versions unless there is a documented compatibility or reproducibility reason. Prefer floating current stable versions for early project scaffolding.
@@ -68,16 +69,16 @@ Keep diagnostics separate from the hot path.
 
 Keep business logic decoupled from WPF views. UI should bind to view models and services; protocol, transport, validation, startup behavior, and HID mapping logic must remain testable without constructing WPF controls. The WPF UI should be replaceable later without rewriting app logic.
 
-Prefer small interfaces at boundaries that will change: Steam Input integration, transport, device discovery, app startup registration, foreground-window detection, diagnostics, and HID report mapping.
+Do not add abstractions, settings, modes, services, or configuration switches unless they are required by the MVP or the user explicitly asks for them. When a use case is unclear, ask before implementing.
 
-Autostart must be opt-in and visibly configurable. It should use the least surprising Windows mechanism available for a normal per-user desktop app, and it must be easy to disable from the app.
+Prefer a few focused files over many tiny abstractions. Keep the code easy for a person to read and change.
 
-Multiple-instance behavior must be deliberate. Never allow two bridge processes to write to the Teensy simultaneously. Use a named mutex or equivalent single-owner mechanism before opening the HID transport. Use local IPC only if profile switching between Steam shortcuts is needed.
+Multiple bridge instances are supported. Each Steam shortcut may launch its own process so Steam Play/Stop state can track that shortcut. Forwarding must still be gated so only the instance whose receiver game is foreground emits output.
 
 The profile model must distinguish:
 
 - Steam shortcut/profile: the Steam-side configuration selected by launching a specific Steam shortcut.
-- Bridge profile: app-side metadata such as target process names, forwarding rules, Teensy device selection, and optional auto-exit behavior.
+- Game profile: app-side metadata stored in `appsettings.json`, keyed by id, with executable, arguments, working directory, and receiver process names.
 - Steam Input action sets: in-profile modes such as gameplay, menu, buy menu, or shop; do not repurpose these as separate games.
 
 Use current official documentation for platform APIs, libraries, and tooling.
@@ -86,7 +87,14 @@ Use current official documentation for platform APIs, libraries, and tooling.
 
 - `.slnx` solution format.
 - Current stable .NET project files with latest C# language selection and explicit usings.
-- WPF shell with profile startup, single-instance guard, foreground target gate, loopback transport, forwarding toggle, keyboard and mouse synthetic input controls, and diagnostics.
+- WPF shell with editable game settings, profile startup, optional target launch, foreground receiver gate, loopback transport, output preview, and diagnostics.
+- Launch mode (`--launch`) starts the configured target, keeps the bridge UI hidden behind a tray icon, and shows only a transparent Steam overlay host window. The current tray behavior is per bridge process; do not add a shared tray host or cross-process instance list without an explicit IPC decision.
+- If the bridge starts a target process, it owns that process lifetime. Steam stopping the bridge should close the launched process tree, and the bridge should exit when the launched receiver exits.
+- Closing the status window hides it back to the tray. The app exits only through the tray Exit command, launched receiver exit, or Steam/process termination.
+- Multiple instances may save `appsettings.json`; writes must use the settings-store mutex and atomic write path so profile saves merge with the latest file contents.
+- Output is always previewed in the app model and is only forwarded when a configured receiver process is the foreground process. Do not add manual output-destination modes for v1.
+- Steam ROM Manager export should generate bridge-targeted shortcuts, not game-targeted shortcuts. Each generated entry should launch the bridge with `--profile <id> --launch`; the selected profile then launches the configured game executable.
+- Steam Input integration belongs under `app/SteamHidBridge.App/Steam/`. Keep the real Steamworks API reader isolated there; do not let WPF focus state drive input capture.
 - Shared C# protocol library for frame encoding, validation, and HID report payloads.
 - MSTest protocol tests for synthetic input and malformed-frame handling.
 - PlatformIO firmware placeholder for Teensy 4.0.

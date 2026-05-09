@@ -1,19 +1,20 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
-  <ItemGroup>
-    <ProjectReference Include="..\..\protocol\SteamHidBridge.Protocol\SteamHidBridge.Protocol.csproj" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <None Include="profiles.example.json" CopyToOutputDirectory="PreserveNewest" />
-  </ItemGroup>
-
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0-windows</TargetFramework>
     <Nullable>enable</Nullable>
     <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\protocol\SteamHidBridge.Protocol\SteamHidBridge.Protocol.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="appsettings.example.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 
 </Project>

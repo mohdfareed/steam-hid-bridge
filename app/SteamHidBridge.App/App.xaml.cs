@@ -1,11 +1,14 @@
+using System;
+using System.IO;
+using System.Linq;
 using System.Windows;
-using SteamHidBridge.App.Input;
+using System.Windows.Threading;
+using SteamHidBridge.App.Infrastructure;
 using SteamHidBridge.App.Profiles;
 using SteamHidBridge.App.Startup;
 using SteamHidBridge.App.Transport;
 using SteamHidBridge.App.ViewModels;
 using SteamHidBridge.App.Views;
-using SteamHidBridge.App.Windows;
 
 [assembly: ThemeInfo(ResourceDictionaryLocation.None, ResourceDictionaryLocation.SourceAssembly)]
 
@@ -13,45 +16,121 @@ namespace SteamHidBridge.App;
 
 public partial class App : Application
 {
-    private SingleInstanceGuard? singleInstance;
+    private TrayIconHost? trayIconHost;
+    private MainWindowViewModel? mainWindowViewModel;
+    private SteamOverlayHostWindow? overlayHostWindow;
+    private bool isExiting;
+
+    public App()
+    {
+        DispatcherUnhandledException += OnDispatcherUnhandledException;
+        AppDomain.CurrentDomain.UnhandledException += OnUnhandledException;
+    }
 
     protected override void OnStartup(StartupEventArgs e)
     {
-        base.OnStartup(e);
-
-        BridgeLaunchOptions launchOptions = BridgeLaunchOptions.Parse(e.Args);
-        singleInstance = SingleInstanceGuard.TryAcquire();
-        if (singleInstance is null)
+        try
         {
-            MessageBox.Show(
-                "Steam HID Bridge is already running. Close the running instance before launching another profile.",
-                "Steam HID Bridge",
-                MessageBoxButton.OK,
-                MessageBoxImage.Information);
-            Shutdown(1);
-            return;
-        }
+            base.OnStartup(e);
+            AppLog.Write($"startup args=[{string.Join(" ", e.Args.Select(arg => "\"" + arg + "\""))}] base={AppContext.BaseDirectory}");
 
-        BridgeProfileStore profileStore = BridgeProfileStore.LoadDefault();
-        BridgeProfile profile = profileStore.Resolve(launchOptions.ProfileId);
+            BridgeLaunchOptions launchOptions = BridgeLaunchOptions.Parse(e.Args);
+            AppLog.Write($"launch-options profile={launchOptions.ProfileId} launchGame={launchOptions.LaunchGame}");
 
-        var window = new MainWindow
-        {
-            DataContext = new MainWindowViewModel(
+            AppSettingsStore settingsStore = AppSettingsStore.LoadDefault();
+            AppLog.Write($"settings loaded path={settingsStore.Path}");
+
+            mainWindowViewModel = new MainWindowViewModel(
                 launchOptions,
-                profile,
-                new LoopbackBridgeTransport(),
-                new SteamInputStatusSource(),
-                new Win32ForegroundWindowService())
-        };
+                settingsStore,
+                new LoopbackBridgeTransport());
+            mainWindowViewModel.ExitRequested += ExitApplication;
 
-        MainWindow = window;
-        window.Show();
+            MainWindow window = new()
+            {
+                DataContext = mainWindowViewModel
+            };
+
+            window.Closing += OnMainWindowClosing;
+            window.Closed += (_, _) => AppLog.Write("main-window closed");
+            MainWindow = window;
+
+            trayIconHost = new TrayIconHost(window, launchOptions.ProfileId, () => ExitApplication(0));
+            if (launchOptions.LaunchGame)
+            {
+                overlayHostWindow = new SteamOverlayHostWindow();
+                overlayHostWindow.Show();
+                AppLog.Write("main-window hidden and overlay-host shown for launch mode");
+            }
+            else
+            {
+                window.Show();
+                _ = window.Activate();
+                AppLog.Write("main-window shown");
+            }
+        }
+        catch (Exception ex)
+        {
+            ShowStartupError(ex);
+            Shutdown(1);
+        }
     }
 
     protected override void OnExit(ExitEventArgs e)
     {
-        singleInstance?.Dispose();
+        isExiting = true;
+        mainWindowViewModel?.StopLaunchedProcesses();
+        overlayHostWindow?.Close();
+        trayIconHost?.Dispose();
+        AppLog.Write($"exit code={e.ApplicationExitCode}");
         base.OnExit(e);
+    }
+
+    private void OnMainWindowClosing(object? sender, System.ComponentModel.CancelEventArgs e)
+    {
+        if (isExiting)
+        {
+            return;
+        }
+
+        e.Cancel = true;
+        if (sender is Window window)
+        {
+            window.Hide();
+            AppLog.Write("main-window hidden to tray");
+        }
+    }
+
+    private void ExitApplication(int exitCode)
+    {
+        isExiting = true;
+        Shutdown(exitCode);
+    }
+
+    private static void OnDispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)
+    {
+        AppLog.Write("dispatcher-unhandled-exception");
+        ShowStartupError(e.Exception);
+        e.Handled = true;
+        Current.Shutdown(1);
+    }
+
+    private static void OnUnhandledException(object sender, UnhandledExceptionEventArgs e)
+    {
+        if (e.ExceptionObject is Exception exception)
+        {
+            AppLog.WriteException("domain-unhandled-exception", exception);
+        }
+    }
+
+    private static void ShowStartupError(Exception exception)
+    {
+        AppLog.WriteException("startup-error", exception);
+        string logPath = Path.Combine(AppContext.BaseDirectory, "SteamHidBridge.error.log");
+        _ = MessageBox.Show(
+            $"Steam HID Bridge failed to start.\n\n{exception.Message}\n\nDetails were written to:\n{logPath}",
+            "Steam HID Bridge",
+            MessageBoxButton.OK,
+            MessageBoxImage.Error);
     }
 }
