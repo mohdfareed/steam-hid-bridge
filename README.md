@@ -48,6 +48,13 @@ Default install location:
 
 The app can check GitHub Releases for updates from its App section. Updating closes all bridge instances, preserves `appsettings.json`, and replaces the self-contained app folder with the latest release package.
 
+Runtime logs are written under the install folder:
+
+```text
+logs/app.log
+logs/update.log
+```
+
 Run the app directly:
 
 ```powershell

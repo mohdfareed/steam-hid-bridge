@@ -55,7 +55,7 @@ try {
     }
 
     Get-ChildItem -LiteralPath $InstallDir -Force |
-        Where-Object { $_.Name -ne "appsettings.json" } |
+        Where-Object { $_.Name -notin @("appsettings.json", "logs") } |
         Remove-Item -Recurse -Force
 
     foreach ($item in Get-ChildItem -LiteralPath $extractPath -Force) {

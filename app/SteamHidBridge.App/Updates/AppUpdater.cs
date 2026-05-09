@@ -59,11 +59,14 @@ public sealed class AppUpdater
             Path.GetTempPath(),
             $"SteamHidBridgeUpdate-{Guid.NewGuid():N}.ps1");
         var tempCommandPath = Path.ChangeExtension(tempScriptPath, ".cmd");
-        var logPath = Path.Combine(Path.GetTempPath(), "SteamHidBridge-update.log");
 
         File.Copy(sourceScriptPath, tempScriptPath, overwrite: true);
 
         var installDir = Path.TrimEndingDirectorySeparator(AppContext.BaseDirectory);
+        var logsDir = Path.Combine(installDir, "logs");
+        Directory.CreateDirectory(logsDir);
+        var logPath = Path.Combine(logsDir, "update.log");
+
         var powerShellArguments = string.Join(
             ' ',
             "-NoProfile",

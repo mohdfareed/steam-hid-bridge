@@ -99,6 +99,7 @@ Use current official documentation for platform APIs, libraries, and tooling.
 - Release tags use `vMAJOR.MINOR.PATCH`, for example `v0.1.1`. Tag pushes matching that shape build, test, package, and create a GitHub Release with `SteamHidBridge-win-x64.zip`.
 - The installer script lives at `scripts/install.ps1`, downloads from GitHub Releases, preserves existing `appsettings.json`, and creates a Desktop shortcut.
 - App updates use GitHub Releases. The app checks the latest release, asks for confirmation, launches `update.ps1`, closes all bridge instances, preserves `appsettings.json`, and replaces the published app folder. Do not make the running process overwrite its own executable directly.
+- Runtime logs belong under the installed app's `logs/` folder. Keep app lifecycle/error logging in `logs/app.log` and updater wrapper output in `logs/update.log`; do not add new ad hoc log files without a documented need.
 - Steam Input config forcing uses Steam's official `steam://forceinputappid/<appid>` URL only while the configured receiver is foreground, and resets with `steam://forceinputappid/0` when foreground is lost or the bridge exits.
 - Steam Input integration belongs under `app/SteamHidBridge.App/Steam/`. Keep the real Steamworks API reader isolated there; do not let WPF focus state drive input capture.
 - Shared C# protocol library for frame encoding, validation, and the HID input payload.

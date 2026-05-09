@@ -67,7 +67,7 @@ try {
     New-Item -ItemType Directory -Path $InstallDir -Force | Out-Null
 
     Get-ChildItem -LiteralPath $InstallDir -Force |
-    Where-Object { $_.Name -ne "appsettings.json" } |
+    Where-Object { $_.Name -notin @("appsettings.json", "logs") } |
     Remove-Item -Recurse -Force
 
     Copy-Item -Path (Join-Path $extractPath "*") -Destination $InstallDir -Recurse -Force

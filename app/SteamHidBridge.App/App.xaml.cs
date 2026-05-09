@@ -135,9 +135,8 @@ public partial class App : Application
     private static void ShowStartupError(Exception exception)
     {
         AppLog.WriteException("startup-error", exception);
-        string logPath = Path.Combine(AppContext.BaseDirectory, "SteamHidBridge.error.log");
         _ = MessageBox.Show(
-            $"Steam HID Bridge failed to start.\n\n{exception.Message}\n\nDetails were written to:\n{logPath}",
+            $"Steam HID Bridge failed to start.\n\n{exception.Message}\n\nDetails were written to:\n{AppLog.FilePath}",
             "Steam HID Bridge",
             MessageBoxButton.OK,
             MessageBoxImage.Error);
