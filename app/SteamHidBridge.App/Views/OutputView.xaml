@@ -4,105 +4,41 @@
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <DockPanel Margin="0,0,0,14">
-            <Ellipse DockPanel.Dock="Left"
-                     Width="10"
-                     Height="10"
-                     Fill="{Binding StatusBrush}"
-                     Margin="0,0,8,0"
-                     VerticalAlignment="Center" />
-            <TextBlock Text="Output preview" FontWeight="SemiBold" VerticalAlignment="Center" />
-        </DockPanel>
+        <GroupBox Header="Mouse">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="110" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
 
-        <Grid Grid.Row="1" Margin="0,0,0,18">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="230" />
-                <ColumnDefinition Width="*" />
-            </Grid.ColumnDefinitions>
+                <TextBlock Text="Pointer" />
+                <TextBlock Grid.Column="1" Text="{Binding PointerText}" FontFamily="Consolas" />
 
-            <Grid Width="180" Height="280" HorizontalAlignment="Left">
-                <Border CornerRadius="72"
-                        Background="#FFFFFF"
-                        BorderBrush="#CAD2DC"
-                        BorderThickness="2" />
-                <Grid Margin="24,22,24,26">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="54" />
-                        <RowDefinition Height="34" />
-                        <RowDefinition Height="*" />
-                        <RowDefinition Height="44" />
-                    </Grid.RowDefinitions>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="*" />
-                    </Grid.ColumnDefinitions>
+                <TextBlock Grid.Row="1" Text="Wheel" Margin="0,8,0,0" />
+                <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding WheelText}" FontFamily="Consolas" Margin="0,8,0,0" />
 
-                    <Border Background="{Binding MouseLeftBrush}"
-                            BorderBrush="#CAD2DC"
-                            BorderThickness="1,1,1,1"
-                            CornerRadius="44,0,0,0">
-                        <TextBlock Text="Left" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                    </Border>
-                    <Border Grid.Column="1"
-                            Background="{Binding MouseRightBrush}"
-                            BorderBrush="#CAD2DC"
-                            BorderThickness="0,1,1,1"
-                            CornerRadius="0,44,0,0">
-                        <TextBlock Text="Right" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                    </Border>
-                    <Border Grid.Row="1"
-                            Grid.ColumnSpan="2"
-                            Width="32"
-                            Background="{Binding MouseMiddleBrush}"
-                            BorderBrush="#CAD2DC"
-                            BorderThickness="1"
-                            CornerRadius="10"
-                            HorizontalAlignment="Center">
-                        <TextBlock Text="M" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                    </Border>
-                    <StackPanel Grid.Row="3" Grid.ColumnSpan="2" Orientation="Horizontal" HorizontalAlignment="Center">
-                        <Border Width="54"
-                                Height="28"
-                                Margin="0,0,8,0"
-                                Background="{Binding MouseBackBrush}"
-                                BorderBrush="#CAD2DC"
-                                BorderThickness="1"
-                                CornerRadius="4">
-                            <TextBlock Text="Back" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                        </Border>
-                        <Border Width="70"
-                                Height="28"
-                                Background="{Binding MouseForwardBrush}"
-                                BorderBrush="#CAD2DC"
-                                BorderThickness="1"
-                                CornerRadius="4">
-                            <TextBlock Text="Forward" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                        </Border>
-                    </StackPanel>
-                </Grid>
+                <TextBlock Grid.Row="2" Text="Buttons" Margin="0,8,0,0" />
+                <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding MouseButtonsText}" FontFamily="Consolas" Margin="0,8,0,0" />
             </Grid>
+        </GroupBox>
 
-            <StackPanel Grid.Column="1" VerticalAlignment="Top">
-                <TextBlock Text="{Binding PointerText}" FontFamily="Consolas" FontSize="15" />
-                <TextBlock Text="{Binding WheelText}" FontFamily="Consolas" FontSize="15" Margin="0,8,0,0" />
-                <TextBlock Text="{Binding MouseButtonsText}" FontFamily="Consolas" FontSize="15" Margin="0,8,0,0" />
-                <TextBlock Text="{Binding KeyboardText}" FontFamily="Consolas" FontSize="15" Margin="0,8,0,0" />
-            </StackPanel>
-        </Grid>
+        <GroupBox Grid.Row="1" Header="Keyboard" Margin="0,16,0,0">
+            <TextBlock Text="{Binding KeyboardText}" FontFamily="Consolas" />
+        </GroupBox>
 
-        <Border Grid.Row="2"
-                Padding="10"
-                Background="#FFFFFF"
-                BorderBrush="#D7DCE2"
-                BorderThickness="1">
+        <GroupBox Grid.Row="2" Header="Last report" Margin="0,16,0,0">
             <TextBlock Text="{Binding LastOutputText}"
                        TextWrapping="Wrap"
-                       FontFamily="Consolas"
-                       FontSize="13" />
-        </Border>
+                       FontFamily="Consolas" />
+        </GroupBox>
     </Grid>
 </UserControl>

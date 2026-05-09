@@ -55,7 +55,7 @@ public partial class App : Application
             window.Closed += (_, _) => AppLog.Write("main-window closed");
             MainWindow = window;
 
-            trayIconHost = new TrayIconHost(window, mainWindowViewModel.SelectedGameId, () => ExitApplication(0));
+            trayIconHost = new TrayIconHost(window, mainWindowViewModel.InstanceText, () => ExitApplication(0));
             if (launchOptions.LaunchGame)
             {
                 overlayHostWindow = new SteamOverlayHostWindow();

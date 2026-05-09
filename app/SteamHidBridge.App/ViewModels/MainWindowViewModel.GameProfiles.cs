@@ -196,13 +196,23 @@ public sealed partial class MainWindowViewModel
             settingsStore.Document.Games[selectedId] = selectedProfile;
         }
 
-        GameIds.Clear();
-        foreach (string gameId in settingsStore.Document.Games.Keys.Order(StringComparer.OrdinalIgnoreCase))
+        isReloadingGameIds = true;
+        try
         {
-            GameIds.Add(gameId);
+            GameIds.Clear();
+            foreach (string gameId in settingsStore.Document.Games.Keys.Order(StringComparer.OrdinalIgnoreCase))
+            {
+                GameIds.Add(gameId);
+            }
+        }
+        finally
+        {
+            isReloadingGameIds = false;
         }
 
+        selectedGameId = string.Empty;
         LoadEditor(selectedId, selectedProfile);
+        OnPropertyChanged(nameof(SelectedGameId));
     }
 
     private string ResolveSelectedGameId(string requestedId)
@@ -241,6 +251,8 @@ public sealed partial class MainWindowViewModel
         OnPropertyChanged(nameof(EditReceiverProcessesText));
         OnPropertyChanged(nameof(ProfileText));
         OnPropertyChanged(nameof(ReceiverProcessesText));
+        OnPropertyChanged(nameof(InstanceText));
+        OnPropertyChanged(nameof(WindowTitle));
     }
 
     private GameProfile ReadEditorProfile()

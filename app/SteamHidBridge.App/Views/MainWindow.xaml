@@ -5,64 +5,57 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:views="clr-namespace:SteamHidBridge.App.Views"
         mc:Ignorable="d"
-        Title="Steam HID Bridge"
+        Title="{Binding WindowTitle}"
         Icon="/Assets/SteamHidBridge.ico"
-        Width="980"
-        Height="620"
-        MinWidth="860"
-        MinHeight="520"
-        Background="#F6F7F9"
+        Width="900"
+        Height="600"
+        MinWidth="760"
+        MinHeight="420"
         FontFamily="Segoe UI">
     <Window.Resources>
         <Style TargetType="GroupBox">
             <Setter Property="Margin" Value="0" />
-            <Setter Property="Padding" Value="14" />
-            <Setter Property="BorderBrush" Value="#D7DCE2" />
+            <Setter Property="Padding" Value="10" />
         </Style>
-        <Style TargetType="TextBlock">
-            <Setter Property="Foreground" Value="#1F2933" />
+        <Style TargetType="Button">
+            <Setter Property="MinHeight" Value="24" />
+            <Setter Property="MinWidth" Value="80" />
         </Style>
     </Window.Resources>
 
-    <Grid Margin="22">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" />
-        </Grid.RowDefinitions>
-
-        <DockPanel Margin="0,0,0,16" LastChildFill="True">
-            <Border DockPanel.Dock="Right"
-                    Padding="12,7"
-                    Margin="24,0,0,0"
-                    BorderBrush="#B8C4D0"
-                    BorderThickness="1"
-                    CornerRadius="4"
-                    Background="#FFFFFF"
-                    VerticalAlignment="Center">
-                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+    <DockPanel Margin="12">
+        <StatusBar DockPanel.Dock="Bottom">
+            <StatusBarItem>
+                <StackPanel Orientation="Horizontal">
                     <Ellipse Width="10"
                              Height="10"
                              Fill="{Binding StatusBrush}"
-                             Margin="0,0,8,0"
+                             Margin="0,0,6,0"
                              VerticalAlignment="Center" />
-                    <TextBlock Text="{Binding ForwardingStatus}" FontWeight="SemiBold" VerticalAlignment="Center" />
+                    <TextBlock Text="{Binding ForwardingStatus}" />
                 </StackPanel>
-            </Border>
-            <StackPanel>
-                <TextBlock Text="Steam HID Bridge" FontSize="28" FontWeight="SemiBold" />
-                <TextBlock Text="{Binding ProfileText}" Margin="0,1,0,0" Foreground="#5A6878" />
-            </StackPanel>
-        </DockPanel>
+            </StatusBarItem>
+            <Separator />
+            <StatusBarItem Content="{Binding ActivityText}" />
+        </StatusBar>
 
-        <Grid Grid.Row="1">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="2*" />
-                <ColumnDefinition Width="18" />
-                <ColumnDefinition Width="3*" />
-            </Grid.ColumnDefinitions>
+        <StackPanel DockPanel.Dock="Top" Margin="0,0,0,10">
+            <TextBlock Text="Steam HID Bridge" FontSize="16" FontWeight="SemiBold" />
+            <TextBlock Text="{Binding InstanceText}" />
+        </StackPanel>
 
-            <views:GameSettingsView />
-            <views:OutputView Grid.Column="2" />
-        </Grid>
-    </Grid>
+        <ScrollViewer VerticalScrollBarVisibility="Auto"
+                      HorizontalScrollBarVisibility="Auto">
+            <Grid MinWidth="720" Margin="0,0,12,12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="360" />
+                    <ColumnDefinition Width="12" />
+                    <ColumnDefinition Width="*" MinWidth="320" />
+                </Grid.ColumnDefinitions>
+
+                <views:GameSettingsView />
+                <views:OutputView Grid.Column="2" />
+            </Grid>
+        </ScrollViewer>
+    </DockPanel>
 </Window>

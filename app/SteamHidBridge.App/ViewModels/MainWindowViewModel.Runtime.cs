@@ -18,7 +18,7 @@ public sealed partial class MainWindowViewModel
 
         if (receiverProcesses.Length == 0)
         {
-            ForwardingStatus = "Preview only";
+            ForwardingStatus = "Forwarding off";
             UpdateForwardingActive(false);
             UpdateSteamInputConfigForce(false);
             if (launchOptions.LaunchGame && launchedProcess is not null && launchedProcessExited)
@@ -45,7 +45,7 @@ public sealed partial class MainWindowViewModel
 
         bool receiverForeground = receiverRunning && IsReceiverProcess(foregroundProcess);
         bool shouldForward = receiverRunning && receiverForeground;
-        ForwardingStatus = shouldForward ? "Forwarding to foreground receiver" : "Preview only";
+        ForwardingStatus = shouldForward ? "Forwarding on" : "Forwarding off";
         UpdateForwardingActive(shouldForward);
         UpdateSteamInputConfigForce(shouldForward);
 

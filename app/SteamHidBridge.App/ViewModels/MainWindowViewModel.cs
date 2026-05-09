@@ -31,6 +31,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private string editArguments = string.Empty;
     private string editWorkingDirectory = string.Empty;
     private string editReceiverProcessesText = string.Empty;
+    private bool isReloadingGameIds;
     private bool hasSeenReceiverProcess;
     private bool isForwardingActive;
     private bool isStoppingLaunchedProcesses;
@@ -91,6 +92,11 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         get => selectedGameId;
         set
         {
+            if (isReloadingGameIds)
+            {
+                return;
+            }
+
             if (string.IsNullOrWhiteSpace(value) || selectedGameId == value)
             {
                 return;
@@ -189,6 +195,8 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     public Brush MouseForwardBrush => MouseButtonBrush(MouseButtons.Forward);
     public Brush StatusBrush => isForwardingActive ? Brushes.SeaGreen : Brushes.Gray;
     public string VersionText => $"Version {appUpdater.CurrentVersionText}";
+    public string InstanceText => $"{selectedGameId} - PID {Environment.ProcessId}";
+    public string WindowTitle => $"Steam HID Bridge - {InstanceText}";
 
     private string[] ReceiverProcesses => ParseReceiverProcesses(EditReceiverProcessesText);
 

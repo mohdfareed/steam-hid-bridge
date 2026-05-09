@@ -14,13 +14,13 @@ public sealed class TrayIconHost : IDisposable
     private readonly Forms.NotifyIcon notifyIcon;
     private bool disposed;
 
-    public TrayIconHost(MainWindow window, string profileId, Action exit)
+    public TrayIconHost(MainWindow window, string instanceText, Action exit)
     {
         this.window = window;
         this.exit = exit;
 
         Forms.ContextMenuStrip menu = new();
-        _ = menu.Items.Add(new Forms.ToolStripMenuItem($"Profile: {profileId}") { Enabled = false });
+        _ = menu.Items.Add(new Forms.ToolStripMenuItem(instanceText) { Enabled = false });
         _ = menu.Items.Add(new Forms.ToolStripMenuItem("Open", null, (_, _) => ShowWindow()));
         _ = menu.Items.Add(new Forms.ToolStripSeparator());
         _ = menu.Items.Add(new Forms.ToolStripMenuItem("Exit", null, (_, _) => this.exit()));
@@ -29,7 +29,7 @@ public sealed class TrayIconHost : IDisposable
         notifyIcon = new Forms.NotifyIcon
         {
             Icon = icon,
-            Text = BuildText(profileId),
+            Text = BuildText(instanceText),
             ContextMenuStrip = menu,
             Visible = true
         };
@@ -80,9 +80,9 @@ public sealed class TrayIconHost : IDisposable
         return (Drawing.Icon)Drawing.SystemIcons.Application.Clone();
     }
 
-    private static string BuildText(string profileId)
+    private static string BuildText(string instanceText)
     {
-        string text = $"Steam HID Bridge - {profileId}";
+        string text = $"Steam HID Bridge - {instanceText}";
         return text.Length <= 63 ? text : text[..63];
     }
 }
