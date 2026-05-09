@@ -9,5 +9,8 @@ $solution = Join-Path $root "SteamHidBridge.slnx"
 dotnet restore $solution
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+dotnet format $solution --verify-no-changes --no-restore
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
 dotnet build $solution --configuration $Configuration --no-restore
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

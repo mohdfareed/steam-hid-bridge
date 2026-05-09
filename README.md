@@ -12,7 +12,7 @@ protocol/   Host-device frame and HID report payloads
 firmware/   Teensy 4.0 placeholder firmware
 docs/       Steam shortcut and validation notes
 tests/      Protocol tests
-scripts/    Build, test, publish helpers
+scripts/    Build, test, publish, release helpers
 ```
 
 ## Build
@@ -30,6 +30,7 @@ Prerequisites:
 
 `publish.ps1` creates a self-contained Windows build under `artifacts/SteamHidBridge-win-x64`.
 `package-release.ps1` creates the release zip at `artifacts/SteamHidBridge-win-x64.zip`.
+`deploy.ps1` runs the release checks, creates a version tag, and pushes it to trigger the release workflow.
 
 ## Install
 
@@ -70,11 +71,12 @@ pio run -d .\firmware
 
 ## Releases
 
-Push a tag like `v0.1.1` to build and publish a GitHub Release:
+Run the deploy script from a clean working tree:
 
 ```powershell
-git tag v0.1.1
-git push origin v0.1.1
+.\scripts\deploy.ps1
 ```
 
-The release workflow builds, tests, packages `SteamHidBridge-win-x64.zip`, and attaches it to the GitHub Release.
+It prints the latest version tag, prompts for the next version, formats the solution, verifies the tree is still clean, builds, tests, packages, then creates and pushes a `vMAJOR.MINOR.PATCH` tag.
+
+The tag push triggers the release workflow, which builds, tests, packages `SteamHidBridge-win-x64.zip`, and attaches it to the GitHub Release.

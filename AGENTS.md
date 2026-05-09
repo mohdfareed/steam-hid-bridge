@@ -105,6 +105,7 @@ Use current official documentation for platform APIs, libraries, and tooling.
 - MSTest protocol tests for synthetic input and malformed-frame handling.
 - PlatformIO firmware placeholder for Teensy 4.0.
 - Build, test, and publish scripts under `scripts/`.
+- `scripts/deploy.ps1` is the local release gate. It prompts for the next version after printing the latest tag, runs formatting/build/test/package checks, requires a clean working tree, then creates and pushes the version tag that triggers the GitHub Release workflow.
 
 ## Steam Input Research Order
 
