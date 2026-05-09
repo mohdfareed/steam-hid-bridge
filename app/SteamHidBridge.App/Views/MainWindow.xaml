@@ -1,0 +1,214 @@
+<Window x:Class="SteamHidBridge.App.Views.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        Title="Steam HID Bridge"
+        Width="1040"
+        Height="680"
+        MinWidth="900"
+        MinHeight="620"
+        Background="#F6F7F9"
+        FontFamily="Segoe UI">
+    <Window.Resources>
+        <Style TargetType="Button">
+            <Setter Property="Padding" Value="14,8" />
+            <Setter Property="MinWidth" Value="104" />
+        </Style>
+        <Style TargetType="GroupBox">
+            <Setter Property="Margin" Value="0,0,0,16" />
+            <Setter Property="Padding" Value="14" />
+            <Setter Property="BorderBrush" Value="#D7DCE2" />
+        </Style>
+        <Style TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#1F2933" />
+        </Style>
+        <Style TargetType="CheckBox">
+            <Setter Property="Margin" Value="0,0,14,8" />
+        </Style>
+    </Window.Resources>
+
+    <Grid Margin="22">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <DockPanel Margin="0,0,0,18">
+            <StackPanel DockPanel.Dock="Left">
+                <TextBlock Text="Steam HID Bridge" FontSize="28" FontWeight="SemiBold" />
+                <TextBlock Text="{Binding ProfileText}" Foreground="#5A6878" />
+            </StackPanel>
+            <Border DockPanel.Dock="Right"
+                    Padding="12,7"
+                    BorderBrush="#B8C4D0"
+                    BorderThickness="1"
+                    CornerRadius="4"
+                    Background="#FFFFFF">
+                <StackPanel Orientation="Horizontal">
+                    <Ellipse Width="10" Height="10" Fill="{Binding StatusBrush}" Margin="0,0,8,0" />
+                    <TextBlock Text="{Binding ConnectionStatus}" FontWeight="SemiBold" />
+                </StackPanel>
+            </Border>
+        </DockPanel>
+
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="2*" />
+                <ColumnDefinition Width="18" />
+                <ColumnDefinition Width="3*" />
+            </Grid.ColumnDefinitions>
+
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel>
+                    <GroupBox Header="Profile Gate">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="120" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+
+                            <TextBlock Text="Profile" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="1" Text="{Binding ProfileText}" FontWeight="SemiBold" />
+
+                            <TextBlock Grid.Row="1" Text="Targets" Margin="0,8,0,0" VerticalAlignment="Center" />
+                            <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding TargetProcessesText}" Margin="0,8,0,0" />
+
+                            <TextBlock Grid.Row="2" Text="Foreground" Margin="0,8,0,0" VerticalAlignment="Center" />
+                            <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding ForegroundProcessText}" Margin="0,8,0,0" />
+
+                            <TextBlock Grid.Row="3" Text="Gate" Margin="0,8,0,0" VerticalAlignment="Center" />
+                            <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding TargetGateStatus}" Margin="0,8,0,0" />
+                        </Grid>
+                    </GroupBox>
+
+                    <GroupBox Header="Transport">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="120" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+
+                            <TextBlock Text="Mode" VerticalAlignment="Center" />
+                            <ComboBox Grid.Column="1" SelectedIndex="0" IsEnabled="False">
+                                <ComboBoxItem Content="Loopback simulator" />
+                            </ComboBox>
+
+                            <TextBlock Grid.Row="1" Text="Target" Margin="0,12,0,0" VerticalAlignment="Center" />
+                            <TextBox Grid.Row="1" Grid.Column="1" Margin="0,12,0,0" Text="{Binding TargetPort}" IsReadOnly="True" />
+
+                            <TextBlock Grid.Row="2" Text="Steam Input" Margin="0,12,0,0" VerticalAlignment="Center" />
+                            <TextBlock Grid.Row="2" Grid.Column="1" Margin="0,12,0,0" Text="{Binding SteamInputStatusText}" />
+
+                            <StackPanel Grid.Row="3" Grid.ColumnSpan="2" Orientation="Horizontal" Margin="0,18,0,0">
+                                <Button Content="{Binding ConnectButtonText}" Command="{Binding ToggleConnectionCommand}" />
+                                <ToggleButton Margin="12,0,0,0"
+                                              Padding="14,8"
+                                              MinWidth="112"
+                                              Content="Forwarding"
+                                              IsChecked="{Binding IsForwardingEnabled}"
+                                              IsEnabled="{Binding IsConnected}" />
+                            </StackPanel>
+                        </Grid>
+                    </GroupBox>
+
+                    <GroupBox Header="Mouse">
+                        <StackPanel>
+                            <TextBlock Text="Pointer" FontWeight="SemiBold" Margin="0,0,0,6" />
+                            <UniformGrid Columns="2" Margin="0,0,0,12">
+                                <StackPanel Margin="0,0,8,0">
+                                    <TextBlock Text="X" />
+                                    <Slider Minimum="-50" Maximum="50" TickFrequency="1" Value="{Binding MouseDeltaX}" />
+                                </StackPanel>
+                                <StackPanel Margin="8,0,0,0">
+                                    <TextBlock Text="Y" />
+                                    <Slider Minimum="-50" Maximum="50" TickFrequency="1" Value="{Binding MouseDeltaY}" />
+                                </StackPanel>
+                            </UniformGrid>
+
+                            <TextBlock Text="Wheel" FontWeight="SemiBold" Margin="0,0,0,6" />
+                            <Slider Minimum="-10" Maximum="10" TickFrequency="1" IsSnapToTickEnabled="True" Value="{Binding WheelDelta}" Margin="0,0,0,12" />
+
+                            <TextBlock Text="Buttons" FontWeight="SemiBold" Margin="0,0,0,6" />
+                            <WrapPanel>
+                                <CheckBox Content="Left" IsChecked="{Binding IsLeftButtonDown}" />
+                                <CheckBox Content="Right" IsChecked="{Binding IsRightButtonDown}" />
+                                <CheckBox Content="Middle" IsChecked="{Binding IsMiddleButtonDown}" />
+                                <CheckBox Content="Side 1" IsChecked="{Binding IsBackButtonDown}" />
+                                <CheckBox Content="Side 2" IsChecked="{Binding IsForwardButtonDown}" />
+                            </WrapPanel>
+                        </StackPanel>
+                    </GroupBox>
+
+                    <GroupBox Header="Keyboard">
+                        <StackPanel>
+                            <TextBlock Text="Modifiers" FontWeight="SemiBold" Margin="0,0,0,6" />
+                            <WrapPanel>
+                                <CheckBox Content="Left Ctrl" IsChecked="{Binding IsLeftControlDown}" />
+                                <CheckBox Content="Left Shift" IsChecked="{Binding IsLeftShiftDown}" />
+                                <CheckBox Content="Left Alt" IsChecked="{Binding IsLeftAltDown}" />
+                                <CheckBox Content="Left Win" IsChecked="{Binding IsLeftGuiDown}" />
+                                <CheckBox Content="Right Ctrl" IsChecked="{Binding IsRightControlDown}" />
+                                <CheckBox Content="Right Shift" IsChecked="{Binding IsRightShiftDown}" />
+                                <CheckBox Content="Right Alt" IsChecked="{Binding IsRightAltDown}" />
+                                <CheckBox Content="Right Win" IsChecked="{Binding IsRightGuiDown}" />
+                            </WrapPanel>
+
+                            <TextBlock Text="Key" FontWeight="SemiBold" Margin="0,4,0,6" />
+                            <ComboBox ItemsSource="{Binding KeyOptions}"
+                                      SelectedItem="{Binding SelectedKey}"
+                                      DisplayMemberPath="Name" />
+                        </StackPanel>
+                    </GroupBox>
+
+                    <Button Content="Send Synthetic Report"
+                            Command="{Binding SendSyntheticInputCommand}"
+                            IsEnabled="{Binding CanSendSyntheticInput}" />
+                </StackPanel>
+            </ScrollViewer>
+
+            <GroupBox Grid.Column="2" Header="Diagnostics" Margin="0">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <UniformGrid Columns="3" Margin="0,0,0,14">
+                        <StackPanel>
+                            <TextBlock Text="Frames sent" Foreground="#5A6878" />
+                            <TextBlock Text="{Binding FramesSent}" FontSize="22" FontWeight="SemiBold" />
+                        </StackPanel>
+                        <StackPanel>
+                            <TextBlock Text="Frames rejected" Foreground="#5A6878" />
+                            <TextBlock Text="{Binding FramesRejected}" FontSize="22" FontWeight="SemiBold" />
+                        </StackPanel>
+                        <StackPanel>
+                            <TextBlock Text="Last frame" Foreground="#5A6878" />
+                            <TextBlock Text="{Binding LastFrameText}" FontSize="22" FontWeight="SemiBold" />
+                        </StackPanel>
+                    </UniformGrid>
+
+                    <ListBox Grid.Row="1"
+                             ItemsSource="{Binding LogEntries}"
+                             FontFamily="Consolas"
+                             FontSize="12"
+                             Background="#FFFFFF"
+                             BorderBrush="#D7DCE2" />
+                </Grid>
+            </GroupBox>
+        </Grid>
+    </Grid>
+</Window>

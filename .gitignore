@@ -1,0 +1,8 @@
+artifacts/
+
+bin/
+obj/
+
+TestResults/
+
+firmware/.pio/

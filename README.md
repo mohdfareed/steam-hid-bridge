@@ -7,8 +7,8 @@ The intended use is to preserve Steam Input as the source of controller configur
 ## Architecture
 
 ```text
-Steam Input -> Windows bridge -> USB transport -> Teensy firmware -> USB HID reports
-````
+Steam shortcut -> Windows bridge -> Steam Input -> USB transport -> Teensy firmware -> USB HID reports -> target game
+```
 
 ## Components
 
@@ -16,8 +16,9 @@ Steam Input -> Windows bridge -> USB transport -> Teensy firmware -> USB HID rep
 firmware/   Teensy firmware
 app/        Windows bridge application
 protocol/   Host-device protocol
-docs/       Design and validation notes
-tools/      Development and test utilities
+docs/       Steam shortcut and spike notes
+tests/      Protocol and synthetic input tests
+scripts/    Development and test utilities
 ```
 
 ## Hardware
@@ -26,6 +27,32 @@ Target device:
 
 * Teensy 4.0
 * USB-A to Micro-USB data cable
+
+## Build
+
+Prerequisites:
+
+- Latest stable .NET SDK that supports the project target framework.
+- PlatformIO CLI for firmware work.
+
+```powershell
+.\scripts\build.ps1
+.\scripts\test.ps1
+.\scripts\publish.ps1
+```
+
+Run the app during pre-hardware development:
+
+```powershell
+dotnet run --project .\app\SteamHidBridge.App
+dotnet run --project .\app\SteamHidBridge.App -- --profile valorant
+```
+
+Firmware build, once PlatformIO is installed:
+
+```powershell
+pio run -d .\firmware
+```
 
 ## Use
 

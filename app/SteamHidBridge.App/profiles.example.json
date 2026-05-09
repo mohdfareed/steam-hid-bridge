@@ -1,0 +1,18 @@
+{
+  "profiles": [
+    {
+      "id": "valorant",
+      "displayName": "Valorant",
+      "targetProcesses": [ "VALORANT-Win64-Shipping.exe" ],
+      "autoEnableWhenForeground": true,
+      "autoExitWhenTargetExits": false
+    },
+    {
+      "id": "league-of-legends",
+      "displayName": "League of Legends",
+      "targetProcesses": [ "League of Legends.exe" ],
+      "autoEnableWhenForeground": true,
+      "autoExitWhenTargetExits": false
+    }
+  ]
+}
