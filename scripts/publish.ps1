@@ -13,6 +13,11 @@ if (Test-Path $output) {
     Remove-Item -LiteralPath $output -Recurse -Force
 }
 
+$oldDriverStaging = Join-Path $root "artifacts\driver"
+if (Test-Path $oldDriverStaging) {
+    Remove-Item -LiteralPath $oldDriverStaging -Recurse -Force
+}
+
 $publishArgs = @(
     "publish",
     "$root\app\SteamHidBridge.App\SteamHidBridge.App.csproj",
@@ -38,8 +43,8 @@ if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 if (-not $SkipDriver) {
     & (Join-Path $root "scripts\internal\driver-build.ps1") -Configuration $Configuration -Platform x64
 
-    $driverSource = Join-Path $root "artifacts\driver\SteamHidBridge.VirtualMouse\x64\$Configuration"
-    $senderSource = Join-Path $root "artifacts\driver\SteamHidBridge.VirtualMouse.TestSender\x64\$Configuration"
+    $driverSource = Join-Path $root "driver\obj\SteamHidBridge.VirtualMouse\x64\$Configuration"
+    $senderSource = Join-Path $root "driver\obj\SteamHidBridge.VirtualMouse.TestSender\x64\$Configuration"
     $driverDest = Join-Path $output "driver"
     New-Item -ItemType Directory -Force -Path $driverDest | Out-Null
 

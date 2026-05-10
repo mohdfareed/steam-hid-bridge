@@ -29,11 +29,11 @@ function Find-WindowsKitTool {
     }
 
     $candidate = Get-ChildItem -LiteralPath $toolsRoot -Recurse -Filter $Name -ErrorAction SilentlyContinue |
-        Where-Object { $_.FullName -match "\\$Platform\\" } |
-        Sort-Object FullName -Descending |
-        Select-Object -First 1
+    Where-Object { $_.FullName -match "\\$Platform\\" } |
+    Sort-Object FullName -Descending |
+    Select-Object -First 1
 
-    return $candidate?.FullName
+    return $candidate.FullName
 }
 
 function Enable-TestSigningIfRequested {
@@ -49,7 +49,7 @@ function Enable-TestSigningIfRequested {
     Write-Host "Test signing is enabled. Reboot before installing the test driver if it was not already enabled."
 }
 
-function Sign-DriverPackage {
+function Invoke-DriverPackageSigning {
     param([string]$CatalogPath)
 
     if (-not $Sign) {
@@ -63,9 +63,9 @@ function Sign-DriverPackage {
 
     $subject = "CN=Steam HID Bridge Test Driver"
     $cert = Get-ChildItem Cert:\CurrentUser\My |
-        Where-Object { $_.Subject -eq $subject -and $_.HasPrivateKey } |
-        Sort-Object NotAfter -Descending |
-        Select-Object -First 1
+    Where-Object { $_.Subject -eq $subject -and $_.HasPrivateKey } |
+    Sort-Object NotAfter -Descending |
+    Select-Object -First 1
 
     if (-not $cert) {
         $cert = New-SelfSignedCertificate `
@@ -107,7 +107,7 @@ $driverOutput = if (Test-Path -LiteralPath $packagedInf) {
     $scriptDir
 }
 else {
-    Join-Path $repoRoot "artifacts\driver\SteamHidBridge.VirtualMouse\$Platform\$Configuration"
+    Join-Path $repoRoot "driver\obj\SteamHidBridge.VirtualMouse\$Platform\$Configuration"
 }
 
 $infPath = Join-Path $driverOutput "SteamHidBridge.VirtualMouse.inf"
@@ -120,7 +120,7 @@ if (-not (Test-Path -LiteralPath $infPath)) {
 Enable-TestSigningIfRequested
 
 if (Test-Path -LiteralPath $catPath) {
-    Sign-DriverPackage -CatalogPath $catPath
+    Invoke-DriverPackageSigning -CatalogPath $catPath
 }
 elseif ($Sign) {
     throw "Driver catalog not found: $catPath. Build the driver package first."

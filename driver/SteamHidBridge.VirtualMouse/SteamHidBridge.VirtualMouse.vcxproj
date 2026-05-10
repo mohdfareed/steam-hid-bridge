@@ -37,8 +37,8 @@
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <PropertyGroup>
     <RepoRoot>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\..\..'))\</RepoRoot>
-    <OutDir>$(RepoRoot)artifacts\driver\$(MSBuildProjectName)\$(Platform)\$(Configuration)\</OutDir>
-    <IntDir>$(RepoRoot)obj\driver\$(MSBuildProjectName)\$(Platform)\$(Configuration)\</IntDir>
+    <OutDir>$(RepoRoot)driver\obj\$(MSBuildProjectName)\$(Platform)\$(Configuration)\</OutDir>
+    <IntDir>$(RepoRoot)driver\obj\$(MSBuildProjectName)\$(Platform)\$(Configuration)\</IntDir>
     <TargetName>SteamHidBridge.VirtualMouse</TargetName>
   </PropertyGroup>
   <ItemDefinitionGroup>
