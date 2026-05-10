@@ -1,6 +1,6 @@
 using System;
+using SteamHidBridge.App.Input;
 using SteamHidBridge.App.Windows;
-using SteamHidBridge.Protocol;
 
 namespace SteamHidBridge.App.ViewModels;
 
@@ -48,11 +48,22 @@ public sealed partial class MainWindowViewModel
         ForwardingStatus = shouldForward ? "Forwarding on" : "Forwarding off";
         UpdateForwardingActive(shouldForward);
         UpdateSteamInputConfigForce(shouldForward);
+        UpdateInputLoopText();
 
-        if (Steam.SteamInputReader.TryReadLatest(out HidInputReport report))
+        string steamInputStatus = steamMouseInputEmitter.StatusText;
+        if (!string.IsNullOrWhiteSpace(steamInputStatus) &&
+            !string.Equals(ActivityText, steamInputStatus, StringComparison.Ordinal))
         {
-            PreviewOutput(report);
+            SetActivity(steamInputStatus);
         }
+    }
+
+    private void UpdateInputLoopText()
+    {
+        MouseInputLoopStatistics statistics = mouseInputLoop.GetStatistics();
+        InputLoopText = statistics.PollCount == 0
+            ? "input loop starting"
+            : $"poll {statistics.PollsPerSecond:F0}/s, frames {statistics.FramesPerSecond:F0}/s";
     }
 
     private void UpdateForwardingActive(bool value)

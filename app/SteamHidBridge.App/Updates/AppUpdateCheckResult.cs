@@ -6,7 +6,8 @@ public sealed record AppUpdateCheckResult(
     Version CurrentVersion,
     Version LatestVersion,
     string LatestTag,
-    string PackageUrl)
+    string PackageUrl,
+    string UpdaterUrl)
 {
     public bool IsUpdateAvailable => LatestVersion > CurrentVersion;
 

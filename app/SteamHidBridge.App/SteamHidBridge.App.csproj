@@ -25,8 +25,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="Steamworks.NET" Version="*" />
+  </ItemGroup>
+
+  <ItemGroup>
     <None Include="appsettings.example.json" CopyToOutputDirectory="PreserveNewest" />
-    <None Include="Assets\update.ps1" Link="update.ps1" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

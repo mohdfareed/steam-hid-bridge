@@ -17,7 +17,6 @@ $signalName = "Local\SteamHidBridge.ShutdownForUpdate"
 $tempRoot = Join-Path ([IO.Path]::GetTempPath()) ("SteamHidBridgeUpdate-" + [guid]::NewGuid())
 $zipPath = Join-Path $tempRoot $assetName
 $extractPath = Join-Path $tempRoot "package"
-$preservedSettingsPath = Join-Path $tempRoot "appsettings.json"
 
 function Get-BridgeProcesses {
     foreach ($processName in $processNames) {
@@ -51,10 +50,6 @@ try {
     New-Item -ItemType Directory -Path $extractPath -Force | Out-Null
     Expand-Archive -LiteralPath $zipPath -DestinationPath $extractPath -Force
 
-    if (Test-Path -LiteralPath (Join-Path $InstallDir "appsettings.json")) {
-        Copy-Item -LiteralPath (Join-Path $InstallDir "appsettings.json") -Destination $preservedSettingsPath -Force
-    }
-
     $shutdownEvent = [Threading.EventWaitHandle]::new($false, [Threading.EventResetMode]::ManualReset, $signalName)
     $shutdownEvent.Reset() | Out-Null
     $shutdownEvent.Set() | Out-Null
@@ -67,14 +62,9 @@ try {
     New-Item -ItemType Directory -Path $InstallDir -Force | Out-Null
 
     Get-ChildItem -LiteralPath $InstallDir -Force |
-    Where-Object { $_.Name -notin @("appsettings.json", "logs") } |
     Remove-Item -Recurse -Force
 
     Copy-Item -Path (Join-Path $extractPath "*") -Destination $InstallDir -Recurse -Force
-
-    if (Test-Path -LiteralPath $preservedSettingsPath) {
-        Copy-Item -LiteralPath $preservedSettingsPath -Destination (Join-Path $InstallDir "appsettings.json") -Force
-    }
 
     Write-Host "Steam HID Bridge updated."
 }

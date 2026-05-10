@@ -8,6 +8,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
+using SteamHidBridge.App.Infrastructure;
 
 namespace SteamHidBridge.App.Updates;
 
@@ -16,6 +17,7 @@ public sealed class AppUpdater
     private const string Owner = "mohdfareed";
     private const string Repository = "steam-hid-bridge";
     private const string PackageAssetName = "SteamHidBridge-win-x64.zip";
+    private const string UpdaterAssetName = "SteamHidBridge-update.ps1";
 
     private static readonly Uri LatestReleaseUri = new($"https://api.github.com/repos/{Owner}/{Repository}/releases/latest");
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
@@ -43,29 +45,34 @@ public sealed class AppUpdater
 
         var asset = release.Assets.FirstOrDefault(candidate => candidate.Name == PackageAssetName)
             ?? throw new InvalidOperationException($"Latest release does not include {PackageAssetName}.");
+        var updater = release.Assets.FirstOrDefault(candidate => candidate.Name == UpdaterAssetName)
+            ?? throw new InvalidOperationException($"Latest release does not include {UpdaterAssetName}.");
 
-        return new AppUpdateCheckResult(CurrentVersion, latestVersion, release.TagName, asset.DownloadUrl);
+        return new AppUpdateCheckResult(CurrentVersion, latestVersion, release.TagName, asset.DownloadUrl, updater.DownloadUrl);
     }
 
     public static void StartUpdate(AppUpdateCheckResult update)
     {
-        var sourceScriptPath = Path.Combine(AppContext.BaseDirectory, "update.ps1");
-        if (!File.Exists(sourceScriptPath))
-        {
-            throw new FileNotFoundException("The updater script is missing from the app folder.", sourceScriptPath);
-        }
-
-        var tempScriptPath = Path.Combine(
-            Path.GetTempPath(),
-            $"SteamHidBridgeUpdate-{Guid.NewGuid():N}.ps1");
-        var tempCommandPath = Path.ChangeExtension(tempScriptPath, ".cmd");
-
-        File.Copy(sourceScriptPath, tempScriptPath, overwrite: true);
+        var tempRoot = Path.Combine(Path.GetTempPath(), $"SteamHidBridgeUpdate-{Guid.NewGuid():N}");
+        var tempScriptPath = Path.Combine(tempRoot, UpdaterAssetName);
+        var tempBootstrapPath = Path.Combine(tempRoot, "start-update.ps1");
+        var tempCommandPath = Path.Combine(tempRoot, "start-update.cmd");
 
         var installDir = Path.TrimEndingDirectorySeparator(AppContext.BaseDirectory);
-        var logsDir = Path.Combine(installDir, "logs");
-        Directory.CreateDirectory(logsDir);
-        var logPath = Path.Combine(logsDir, "update.log");
+        Directory.CreateDirectory(tempRoot);
+        Directory.CreateDirectory(AppDataPaths.LogDirectory);
+        var logPath = AppDataPaths.UpdateLogPath;
+
+        File.WriteAllText(
+            tempBootstrapPath,
+            $"""
+            $ErrorActionPreference = "Stop"
+            Invoke-WebRequest -Uri {PowerShellQuote(update.UpdaterUrl)} -OutFile {PowerShellQuote(tempScriptPath)}
+            & {PowerShellQuote(tempScriptPath)} `
+                -PackageUrl {PowerShellQuote(update.PackageUrl)} `
+                -InstallDir {PowerShellQuote(installDir)} `
+                -CurrentProcessId {Environment.ProcessId}
+            """);
 
         var powerShellArguments = string.Join(
             ' ',
@@ -73,13 +80,7 @@ public sealed class AppUpdater
             "-ExecutionPolicy",
             "Bypass",
             "-File",
-            CommandLineQuote(tempScriptPath),
-            "-PackageUrl",
-            CommandLineQuote(update.PackageUrl),
-            "-InstallDir",
-            CommandLineQuote(installDir),
-            "-CurrentProcessId",
-            Environment.ProcessId.ToString());
+            CommandLineQuote(tempBootstrapPath));
 
         File.WriteAllText(
             tempCommandPath,
@@ -159,6 +160,11 @@ public sealed class AppUpdater
     private static string CommandLineQuote(string value)
     {
         return $"\"{value.Replace("\"", "\"\"")}\"";
+    }
+
+    private static string PowerShellQuote(string value)
+    {
+        return $"'{value.Replace("'", "''")}'";
     }
 
     private sealed class GitHubRelease

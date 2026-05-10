@@ -10,7 +10,6 @@ Current MVP status: the Windows tray app works for profile launch, target proces
 app/        Windows bridge application
 protocol/   Host-device frame and HID report payloads
 firmware/   Teensy 4.0 placeholder firmware
-docs/       Steam shortcut and validation notes
 tests/      Protocol tests
 scripts/    Build, test, publish, release helpers
 ```
@@ -34,7 +33,7 @@ Prerequisites:
 
 ## Install
 
-The release installer downloads the latest GitHub Release, asks for an install folder, copies the self-contained app there, creates `appsettings.json` from the example file when needed, and adds a Desktop shortcut.
+The release installer downloads the latest GitHub Release, asks for an install folder, replaces that folder with the self-contained app, and adds a Desktop shortcut.
 
 ```powershell
 irm https://raw.githubusercontent.com/mohdfareed/steam-hid-bridge/main/scripts/install.ps1 | iex
@@ -46,13 +45,14 @@ Default install location:
 %LOCALAPPDATA%\Programs\SteamHidBridge
 ```
 
-The app can check GitHub Releases for updates from its App section. Updating closes all bridge instances, preserves `appsettings.json`, and replaces the self-contained app folder with the latest release package.
+The app can check GitHub Releases for updates from its App section. Updating closes all bridge instances and replaces the self-contained app folder with the latest release package.
 
-Runtime logs are written under the install folder:
+User data is stored outside the install folder:
 
 ```text
-logs/app.log
-logs/update.log
+%LOCALAPPDATA%\SteamHidBridge\appsettings.json
+%LOCALAPPDATA%\SteamHidBridge\logs\app.log
+%LOCALAPPDATA%\SteamHidBridge\logs\update.log
 ```
 
 Run the app directly:

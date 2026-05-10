@@ -63,11 +63,30 @@
         </GroupBox>
 
         <GroupBox Grid.Row="1" Header="Steam ROM Manager" Margin="0,16,0,0">
-            <Button Content="Copy All Profiles"
-                    HorizontalAlignment="Left"
-                    MinWidth="132"
-                    Command="{Binding CopySteamRomManagerJsonCommand}"
-                    ToolTip="Copy Steam ROM Manager JSON for every profile." />
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="118" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <TextBlock Text="Manifest" VerticalAlignment="Center" />
+                <TextBox Grid.Column="1"
+                         Text="{Binding SrmManifestPath, UpdateSourceTrigger=PropertyChanged}"
+                         ToolTip="Manifest JSON path used by your Steam ROM Manager parser." />
+
+                <Button Grid.Row="1"
+                        Grid.Column="1"
+                        Content="Write Manifest"
+                        HorizontalAlignment="Left"
+                        Margin="0,12,0,0"
+                        MinWidth="132"
+                        Command="{Binding WriteSteamRomManagerManifestCommand}"
+                        ToolTip="Write Steam ROM Manager JSON for every profile." />
+            </Grid>
         </GroupBox>
 
         <GroupBox Grid.Row="2" Header="App" Margin="0,16,0,0">

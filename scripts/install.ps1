@@ -30,7 +30,6 @@ if ([string]::IsNullOrWhiteSpace($Version)) {
 $tempRoot = Join-Path ([IO.Path]::GetTempPath()) ("SteamHidBridgeInstall-" + [Guid]::NewGuid())
 $zipPath = Join-Path $tempRoot $assetName
 $extractPath = Join-Path $tempRoot "extract"
-$preservedSettingsPath = Join-Path $tempRoot "appsettings.json"
 
 try {
     New-Item -ItemType Directory -Path $tempRoot, $extractPath -Force | Out-Null
@@ -49,31 +48,12 @@ try {
     New-Item -ItemType Directory -Path $InstallDir -Force | Out-Null
     Expand-Archive -LiteralPath $zipPath -DestinationPath $extractPath -Force
 
-    $settingsPath = Join-Path $InstallDir "appsettings.json"
-    if (Test-Path -LiteralPath $settingsPath) {
-        Copy-Item -LiteralPath $settingsPath -Destination $preservedSettingsPath -Force
-    }
-
     Get-ChildItem -LiteralPath $InstallDir -Force |
-        Where-Object { $_.Name -notin @("appsettings.json", "logs") } |
         Remove-Item -Recurse -Force
 
     foreach ($item in Get-ChildItem -LiteralPath $extractPath -Force) {
         $destination = Join-Path $InstallDir $item.Name
-        if ($item.Name -eq "appsettings.json" -and (Test-Path $destination)) {
-            continue
-        }
-
         Copy-Item -LiteralPath $item.FullName -Destination $destination -Recurse -Force
-    }
-
-    if (Test-Path -LiteralPath $preservedSettingsPath) {
-        Copy-Item -LiteralPath $preservedSettingsPath -Destination $settingsPath -Force
-    }
-
-    $exampleSettingsPath = Join-Path $InstallDir "appsettings.example.json"
-    if (-not (Test-Path $settingsPath) -and (Test-Path $exampleSettingsPath)) {
-        Copy-Item -LiteralPath $exampleSettingsPath -Destination $settingsPath
     }
 
     Get-ChildItem -LiteralPath $InstallDir -Recurse -Force | Unblock-File -ErrorAction SilentlyContinue
@@ -96,7 +76,7 @@ try {
     }
 
     Write-Host "Installed Steam HID Bridge $($release.tag_name)."
-    Write-Host "Settings: $settingsPath"
+    Write-Host "Settings: $([IO.Path]::Combine([Environment]::GetFolderPath('LocalApplicationData'), 'SteamHidBridge', 'appsettings.json'))"
 } finally {
     if (Test-Path $tempRoot) {
         Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue

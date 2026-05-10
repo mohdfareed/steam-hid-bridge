@@ -4,13 +4,13 @@
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
         <GroupBox Header="Mouse">
             <Grid>
                 <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
@@ -28,14 +28,13 @@
 
                 <TextBlock Grid.Row="2" Text="Buttons" Margin="0,8,0,0" />
                 <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding MouseButtonsText}" FontFamily="Consolas" Margin="0,8,0,0" />
+
+                <TextBlock Grid.Row="3" Text="Loop" Margin="0,8,0,0" />
+                <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding InputLoopText}" FontFamily="Consolas" Margin="0,8,0,0" />
             </Grid>
         </GroupBox>
 
-        <GroupBox Grid.Row="1" Header="Keyboard" Margin="0,16,0,0">
-            <TextBlock Text="{Binding KeyboardText}" FontFamily="Consolas" />
-        </GroupBox>
-
-        <GroupBox Grid.Row="2" Header="Last report" Margin="0,16,0,0">
+        <GroupBox Grid.Row="1" Header="Last mouse frame" Margin="0,16,0,0">
             <TextBlock Text="{Binding LastOutputText}"
                        TextWrapping="Wrap"
                        FontFamily="Consolas" />

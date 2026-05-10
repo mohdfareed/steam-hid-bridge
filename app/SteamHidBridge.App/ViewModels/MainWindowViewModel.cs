@@ -8,6 +8,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
 using SteamHidBridge.App.Infrastructure;
+using SteamHidBridge.App.Input;
 using SteamHidBridge.App.Profiles;
 using SteamHidBridge.App.Startup;
 using SteamHidBridge.App.Steam;
@@ -23,6 +24,9 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private readonly AppSettingsStore settingsStore;
     private readonly AppUpdater appUpdater;
     private readonly SteamInputConfigForcer steamInputConfigForcer;
+    private readonly SteamMouseInputEmitter steamMouseInputEmitter;
+    private readonly MouseInputPipeline mouseInputPipeline;
+    private readonly MouseInputLoop mouseInputLoop;
     private readonly DispatcherTimer statusTimer;
     private string selectedGameId = string.Empty;
     private string editGameId = string.Empty;
@@ -31,6 +35,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private string editArguments = string.Empty;
     private string editWorkingDirectory = string.Empty;
     private string editReceiverProcessesText = string.Empty;
+    private string srmManifestPath = string.Empty;
     private bool isReloadingGameIds;
     private bool hasSeenReceiverProcess;
     private bool isForwardingActive;
@@ -46,11 +51,16 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         this.settingsStore = settingsStore;
         appUpdater = new AppUpdater();
         steamInputConfigForcer = new SteamInputConfigForcer(launchOptions.SteamAppId);
+        steamMouseInputEmitter = new SteamMouseInputEmitter();
+        mouseInputPipeline = new MouseInputPipeline(
+            [new MouseVisualizerConsumer(frame => _ = System.Windows.Application.Current.Dispatcher.BeginInvoke(() => PreviewMouseInput(frame)))],
+            [new TeensyMouseOutputConsumer()]);
+        mouseInputLoop = new MouseInputLoop(steamMouseInputEmitter, mouseInputPipeline, () => isForwardingActive);
 
         NewGameCommand = new AsyncRelayCommand(NewGameAsync);
         SaveGameCommand = new AsyncRelayCommand(SaveGameAsync);
         LaunchGameCommand = new AsyncRelayCommand(LaunchGameAsync);
-        CopySteamRomManagerJsonCommand = new AsyncRelayCommand(CopySteamRomManagerJsonAsync);
+        WriteSteamRomManagerManifestCommand = new AsyncRelayCommand(WriteSteamRomManagerManifestAsync);
         CheckForUpdateCommand = new AsyncRelayCommand(CheckForUpdateAsync);
 
         ReloadGameIds(launchOptions.ProfileId);
@@ -63,6 +73,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         statusTimer.Start();
 
         RefreshRuntimeStatus();
+        WriteSrmManifestOnStartup();
         SetActivity($"Ready. profile={selectedGameId}");
         AppLog.Write($"settings={settingsStore.FilePath}");
         AppLog.Write(steamInputConfigForcer.StatusText);
@@ -84,7 +95,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     public ICommand NewGameCommand { get; }
     public ICommand SaveGameCommand { get; }
     public ICommand LaunchGameCommand { get; }
-    public ICommand CopySteamRomManagerJsonCommand { get; }
+    public ICommand WriteSteamRomManagerManifestCommand { get; }
     public ICommand CheckForUpdateCommand { get; }
 
     public string SelectedGameId
@@ -166,6 +177,12 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     public string ProfileText => string.IsNullOrWhiteSpace(EditTitle) ? EditGameId : EditTitle;
     public string ReceiverProcessesText => ReceiverProcesses.Length == 0 ? "None configured" : string.Join(", ", ReceiverProcesses);
 
+    public string SrmManifestPath
+    {
+        get => srmManifestPath;
+        set => SetProperty(ref srmManifestPath, value);
+    }
+
     public string ForwardingStatus
     {
         get;
@@ -178,6 +195,12 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         private set => SetProperty(ref field, value);
     } = "No output yet";
 
+    public string InputLoopText
+    {
+        get;
+        private set => SetProperty(ref field, value);
+    } = "input loop starting";
+
     public string ActivityText
     {
         get;
@@ -187,7 +210,6 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     public string PointerText => $"dx {lastReport.PointerDeltaX}, dy {lastReport.PointerDeltaY}";
     public string WheelText => $"wheel {lastReport.VerticalWheel}";
     public string MouseButtonsText => lastReport.MouseButtons == MouseButtons.None ? "buttons none" : $"buttons {lastReport.MouseButtons}";
-    public string KeyboardText => $"keyboard modifiers {lastReport.KeyboardModifiers}, usage 0x{lastReport.KeyboardUsageId:X2}";
     public Brush MouseLeftBrush => MouseButtonBrush(MouseButtons.Left);
     public Brush MouseRightBrush => MouseButtonBrush(MouseButtons.Right);
     public Brush MouseMiddleBrush => MouseButtonBrush(MouseButtons.Middle);
@@ -231,6 +253,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     public void ResetSteamInputConfig()
     {
         steamInputConfigForcer.Reset();
+        mouseInputLoop.Dispose();
     }
 
     private SolidColorBrush MouseButtonBrush(MouseButtons button)

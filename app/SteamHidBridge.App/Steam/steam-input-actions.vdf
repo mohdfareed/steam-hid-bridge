@@ -1,0 +1,50 @@
+"In Game Actions"
+{
+    "actions"
+    {
+        "bridge"
+        {
+            "title" "#Set_Bridge"
+
+            "StickPadGyro"
+            {
+                "pointer"
+                {
+                    "title" "#Action_Pointer"
+                    "input_mode" "absolute_mouse"
+                }
+            }
+
+            "AnalogTrigger"
+            {
+            }
+
+            "Button"
+            {
+                "mouse_left" "#Action_MouseLeft"
+                "mouse_right" "#Action_MouseRight"
+                "mouse_middle" "#Action_MouseMiddle"
+                "mouse_back" "#Action_MouseBack"
+                "mouse_forward" "#Action_MouseForward"
+                "wheel_up" "#Action_WheelUp"
+                "wheel_down" "#Action_WheelDown"
+            }
+        }
+    }
+
+    "localization"
+    {
+        "english"
+        {
+            "Set_Bridge" "Bridge"
+            "Action_Pointer" "Pointer"
+            "Action_MouseLeft" "Mouse Left"
+            "Action_MouseRight" "Mouse Right"
+            "Action_MouseMiddle" "Mouse Middle"
+            "Action_MouseBack" "Mouse Back"
+            "Action_MouseForward" "Mouse Forward"
+            "Action_WheelUp" "Wheel Up"
+            "Action_WheelDown" "Wheel Down"
+        }
+    }
+}

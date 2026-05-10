@@ -1,3 +1,4 @@
+using SteamHidBridge.App.Input;
 using SteamHidBridge.Protocol;
 
 namespace SteamHidBridge.App.ViewModels;
@@ -9,6 +10,17 @@ public sealed partial class MainWindowViewModel
         SetLastReport(report);
     }
 
+    private void PreviewMouseInput(MouseInputFrame frame)
+    {
+        PreviewOutput(new HidInputReport(
+            frame.PointerDeltaX,
+            frame.PointerDeltaY,
+            frame.VerticalWheel,
+            frame.Buttons,
+            KeyboardModifiers.None,
+            0));
+    }
+
     private void SetLastReport(HidInputReport report)
     {
         lastReport = report;
@@ -16,7 +28,6 @@ public sealed partial class MainWindowViewModel
         OnPropertyChanged(nameof(PointerText));
         OnPropertyChanged(nameof(WheelText));
         OnPropertyChanged(nameof(MouseButtonsText));
-        OnPropertyChanged(nameof(KeyboardText));
         OnPropertyChanged(nameof(MouseLeftBrush));
         OnPropertyChanged(nameof(MouseRightBrush));
         OnPropertyChanged(nameof(MouseMiddleBrush));
@@ -26,6 +37,6 @@ public sealed partial class MainWindowViewModel
 
     private static string FormatReport(HidInputReport report)
     {
-        return $"mouse dx={report.PointerDeltaX}, dy={report.PointerDeltaY}, wheel={report.VerticalWheel}, buttons={report.MouseButtons}; keyboard modifiers={report.KeyboardModifiers}, usage=0x{report.KeyboardUsageId:X2}";
+        return $"mouse dx={report.PointerDeltaX}, dy={report.PointerDeltaY}, wheel={report.VerticalWheel}, buttons={report.MouseButtons}";
     }
 }

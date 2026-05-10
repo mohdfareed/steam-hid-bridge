@@ -4,7 +4,6 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.Threading.Tasks;
 using SteamHidBridge.App.Infrastructure;
@@ -108,7 +107,17 @@ public sealed partial class MainWindowViewModel
         return Task.CompletedTask;
     }
 
-    private Task CopySteamRomManagerJsonAsync()
+    private Task WriteSteamRomManagerManifestAsync()
+    {
+        return WriteSrmManifestAsync(showSuccess: true, persistPath: true);
+    }
+
+    private Task WriteSrmManifestOnStartup()
+    {
+        return WriteSrmManifestAsync(showSuccess: false, persistPath: false);
+    }
+
+    private Task WriteSrmManifestAsync(bool showSuccess, bool persistPath)
     {
         string executable = Environment.ProcessPath ?? string.Empty;
         if (string.IsNullOrWhiteSpace(executable))
@@ -118,17 +127,39 @@ public sealed partial class MainWindowViewModel
         }
 
         string json = SteamRomManagerExport.CreateJson(settingsStore.Document.Games, executable);
-        try
+        string manifestPath = ExpandPath(SrmManifestPath);
+        if (string.IsNullOrWhiteSpace(manifestPath))
         {
-            System.Windows.Clipboard.SetText(json);
-        }
-        catch (Exception ex) when (ex is ExternalException or InvalidOperationException)
-        {
-            SetActivity($"Could not copy Steam ROM Manager JSON: {ex.Message}");
+            SetActivity("Steam ROM Manager manifest path is empty.");
             return Task.CompletedTask;
         }
 
-        SetActivity($"Copied Steam ROM Manager JSON for {settingsStore.Document.Games.Count} profile(s).");
+        try
+        {
+            string? directory = Path.GetDirectoryName(manifestPath);
+            if (!string.IsNullOrWhiteSpace(directory))
+            {
+                _ = Directory.CreateDirectory(directory);
+            }
+
+            File.WriteAllText(manifestPath, json);
+            if (persistPath)
+            {
+                settingsStore.SaveSrmManifestPath(SrmManifestPath);
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException or InvalidOperationException)
+        {
+            SetActivity($"Could not write Steam ROM Manager manifest: {ex.Message}");
+            return Task.CompletedTask;
+        }
+
+        AppLog.Write($"srm manifest written path={manifestPath} profiles={settingsStore.Document.Games.Count}");
+        if (showSuccess)
+        {
+            SetActivity($"Wrote Steam ROM Manager manifest for {settingsStore.Document.Games.Count} profile(s).");
+        }
+
         return Task.CompletedTask;
     }
 
@@ -136,6 +167,7 @@ public sealed partial class MainWindowViewModel
     {
         isStoppingLaunchedProcesses = true;
         statusTimer.Stop();
+        mouseInputLoop.Dispose();
 
         try
         {
@@ -288,6 +320,7 @@ public sealed partial class MainWindowViewModel
         editArguments = profile.Arguments;
         editWorkingDirectory = profile.WorkingDirectory;
         editReceiverProcessesText = string.Join(", ", profile.ReceiverProcesses);
+        srmManifestPath = settingsStore.Document.SrmManifestPath;
         hasSeenReceiverProcess = false;
 
         OnPropertyChanged(nameof(SelectedGameId));
@@ -297,6 +330,7 @@ public sealed partial class MainWindowViewModel
         OnPropertyChanged(nameof(EditArguments));
         OnPropertyChanged(nameof(EditWorkingDirectory));
         OnPropertyChanged(nameof(EditReceiverProcessesText));
+        OnPropertyChanged(nameof(SrmManifestPath));
         OnPropertyChanged(nameof(ProfileText));
         OnPropertyChanged(nameof(ReceiverProcessesText));
         OnPropertyChanged(nameof(InstanceText));
@@ -330,5 +364,17 @@ public sealed partial class MainWindowViewModel
         }
 
         return $"{prefix}-{suffix}";
+    }
+
+    private static string ExpandPath(string path)
+    {
+        path = Environment.ExpandEnvironmentVariables(path.Trim());
+        if (path.StartsWith(@"~\", StringComparison.Ordinal) || path.StartsWith("~/", StringComparison.Ordinal))
+        {
+            string home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            path = Path.Combine(home, path[2..]);
+        }
+
+        return path;
     }
 }

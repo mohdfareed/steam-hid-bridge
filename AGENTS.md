@@ -78,7 +78,7 @@ Multiple bridge instances are supported. Each Steam shortcut may launch its own 
 The profile model must distinguish:
 
 - Steam shortcut/profile: the Steam-side configuration selected by launching a specific Steam shortcut.
-- Game profile: app-side metadata stored in `appsettings.json`, keyed by id, with executable, arguments, working directory, and receiver process names.
+- Game profile: app-side metadata stored in `%LOCALAPPDATA%\SteamHidBridge\appsettings.json`, keyed by id, with executable, arguments, working directory, and receiver process names.
 - Steam Input action sets: in-profile modes such as gameplay, menu, buy menu, or shop; do not repurpose these as separate games.
 
 Use current official documentation for platform APIs, libraries, and tooling.
@@ -94,14 +94,16 @@ Use current official documentation for platform APIs, libraries, and tooling.
 - Multiple instances may save `appsettings.json`; writes must use the settings-store mutex and atomic write path so profile saves merge with the latest file contents.
 - Output is always previewed in the app model. When real Steam Input and Teensy transport are added, forwarding must only run while a configured receiver process is the foreground process. Do not add manual output-destination modes for v1.
 - Steam ROM Manager export should generate bridge-targeted shortcuts, not game-targeted shortcuts. Each generated entry should launch the bridge with `--profile <id> --launch`; the selected profile then launches the configured game executable.
+- Steam ROM Manager integration writes a manifest JSON file for SRM to read. The manifest path is the app-level `srmManifestPath` setting and defaults under `%LOCALAPPDATA%\SteamHidBridge\srm\games.json`. Do not mutate SRM's own parser configuration unless explicitly requested.
 - Do not inject a synthetic `default` profile. If no profile is requested, select an existing profile; create a local `new-game` entry only when there are no profiles loaded.
 - Publish output should be self-contained for the selected Windows runtime unless the user asks for framework-dependent deployment.
 - Release tags use `vMAJOR.MINOR.PATCH`, for example `v0.1.1`. Tag pushes matching that shape build, test, package, and create a GitHub Release with `SteamHidBridge-win-x64.zip`.
-- The installer script lives at `scripts/install.ps1`, downloads from GitHub Releases, preserves existing `appsettings.json`, and creates a Desktop shortcut.
-- App updates use GitHub Releases. The app checks the latest release, asks for confirmation, launches `update.ps1`, closes all bridge instances, preserves `appsettings.json`, and replaces the published app folder. Do not make the running process overwrite its own executable directly.
-- Runtime logs belong under the installed app's `logs/` folder. Keep app lifecycle/error logging in `logs/app.log` and updater wrapper output in `logs/update.log`; do not add new ad hoc log files without a documented need.
+- The installer script lives at `scripts/install.ps1`, downloads from GitHub Releases, replaces the install folder, and creates a Desktop shortcut. User data must live outside the install folder.
+- App updates use GitHub Releases. The app checks the latest release, asks for confirmation, downloads the versioned `SteamHidBridge-update.ps1` release asset, closes all bridge instances, and replaces the published app folder. Do not bundle updater logic in the app package, and do not make the running process overwrite its own executable directly.
+- Runtime settings and logs belong under `%LOCALAPPDATA%\SteamHidBridge\`. Keep app lifecycle/error logging in `logs/app.log` and updater wrapper output in `logs/update.log`; do not add new ad hoc log files without a documented need.
 - Steam Input config forcing uses Steam's official `steam://forceinputappid/<appid>` URL only while the configured receiver is foreground, and resets with `steam://forceinputappid/0` when foreground is lost or the bridge exits.
 - Steam Input integration belongs under `app/SteamHidBridge.App/Steam/`. Keep the real Steamworks API reader isolated there; do not let WPF focus state drive input capture.
+- Steam Input is the only input emitter. Its frames flow through the mouse input pipeline to two consumer types: the WPF visualizer consumer and the physical Teensy mouse output consumer. The visualizer always receives frames; the physical output consumer only receives frames after foreground receiver gating passes. Poll input on a dedicated background loop, independently from slower UI/status refresh work.
 - Shared C# protocol library for frame encoding, validation, and the HID input payload.
 - MSTest protocol tests for synthetic input and malformed-frame handling.
 - PlatformIO firmware placeholder for Teensy 4.0.
@@ -132,7 +134,6 @@ Do not implement Steam config editing, Steam VDF rewriting, or automatic Steam l
 firmware/
 app/
 protocol/
-docs/
 tests/
 scripts/
 README.md
