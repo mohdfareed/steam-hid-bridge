@@ -6,7 +6,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+$root = Split-Path -Parent $PSScriptRoot
 $output = Join-Path $root "artifacts\SteamHidBridge-$Runtime"
 
 if (Test-Path $output) {
@@ -19,7 +19,12 @@ $publishArgs = @(
     "--configuration", $Configuration,
     "--runtime", $Runtime,
     "--self-contained", "true",
-    "--output", $output
+    "--output", $output,
+    "-p:PublishSingleFile=true",
+    "-p:IncludeNativeLibrariesForSelfExtract=true",
+    "-p:EnableCompressionInSingleFile=true",
+    "-p:DebugType=embedded",
+    "-p:DebugSymbols=false"
 )
 
 if (-not [string]::IsNullOrWhiteSpace($Version)) {
@@ -31,7 +36,7 @@ dotnet @publishArgs
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 if (-not $SkipDriver) {
-    & (Join-Path $root "scripts\driver\build.ps1") -Configuration $Configuration -Platform x64
+    & (Join-Path $root "scripts\internal\driver-build.ps1") -Configuration $Configuration -Platform x64
 
     $driverSource = Join-Path $root "artifacts\driver\SteamHidBridge.VirtualMouse\x64\$Configuration"
     $senderSource = Join-Path $root "artifacts\driver\SteamHidBridge.VirtualMouse.TestSender\x64\$Configuration"
@@ -42,7 +47,7 @@ if (-not $SkipDriver) {
     Copy-Item -LiteralPath (Join-Path $driverSource "SteamHidBridge.VirtualMouse.sys") -Destination $driverDest -Force
     Copy-Item -LiteralPath (Join-Path $driverSource "steamhidbridge.virtualmouse.cat") -Destination (Join-Path $driverDest "SteamHidBridge.VirtualMouse.cat") -Force
     Copy-Item -LiteralPath (Join-Path $senderSource "SteamHidBridge.VirtualMouse.TestSender.exe") -Destination $driverDest -Force
-    Copy-Item -LiteralPath (Join-Path $root "scripts\driver\install.ps1") -Destination (Join-Path $driverDest "install.ps1") -Force
+    Copy-Item -LiteralPath (Join-Path $root "scripts\internal\driver-install.ps1") -Destination (Join-Path $driverDest "install.ps1") -Force
 }
 
 Write-Host "Published to $output"

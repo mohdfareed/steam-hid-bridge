@@ -100,8 +100,7 @@ if ($remoteTagExitCode -ne 2) {
 
 Assert-CleanWorkTree
 
-Invoke-Checked "Build" { & (Join-Path $root "scripts\dev\build.ps1") -Configuration Release }
-Invoke-Checked "Test" { & (Join-Path $root "scripts\dev\test.ps1") -Configuration Release }
+Invoke-Checked "Build" { & (Join-Path $root "scripts\check.ps1") -Configuration Release }
 Invoke-Checked "Package" { & (Join-Path $PSScriptRoot "package.ps1") -Configuration Release -Runtime $Runtime -Version $version -SkipDriver:$SkipDriver }
 
 Assert-CleanWorkTree

@@ -61,6 +61,7 @@ if ($Platform -ne "x64") {
 
 $repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $driverDir = Join-Path $repoRoot "driver\SteamHidBridge.VirtualMouse"
+$driverProject = Join-Path $driverDir "SteamHidBridge.VirtualMouse.vcxproj"
 $senderProject = Join-Path $repoRoot "driver\SteamHidBridge.VirtualMouse.TestSender\SteamHidBridge.VirtualMouse.TestSender.vcxproj"
 $driverOut = Join-Path $repoRoot "artifacts\driver\SteamHidBridge.VirtualMouse\$Platform\$Configuration"
 $driverObj = Join-Path $repoRoot "obj\driver\SteamHidBridge.VirtualMouse\$Platform\$Configuration"
@@ -76,6 +77,11 @@ $vcInclude = Join-Path $vcToolsRoot "include"
 $stampinf = Join-Path $wdkRoot "bin\$kitVersion\x64\stampinf.exe"
 $inf2cat = Join-Path $wdkRoot "bin\$kitVersion\x86\Inf2Cat.exe"
 $msbuild = Find-MSBuild
+
+& $msbuild $driverProject /t:Restore /p:Configuration=$Configuration /p:Platform=$Platform
+if ($LASTEXITCODE -ne 0) {
+    throw "Driver dependency restore failed."
+}
 
 foreach ($path in @($wdkRoot, $sdkRoot, $stampinf, $inf2cat)) {
     if (-not (Test-Path -LiteralPath $path)) {

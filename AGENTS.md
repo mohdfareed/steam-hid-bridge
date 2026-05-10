@@ -100,9 +100,9 @@ Use current official documentation for platform APIs, libraries, and tooling.
 - Steam ROM Manager export should generate bridge-targeted shortcuts, not game-targeted shortcuts. Each generated entry should launch the bridge with `--profile <id> --launch`; the selected profile then launches the configured game executable.
 - General app settings live under the `general` JSON object. It contains `theme` (`system`, `light`, or `dark`) and `srmManifestPath`, which defaults under `%LOCALAPPDATA%\SteamHidBridge\srm\games.json`. Theme selection must use WPF's built-in Fluent `ThemeMode` API, not custom control templates. Do not mutate SRM's own parser configuration unless explicitly requested.
 - Do not inject a synthetic `default` profile. If no profile is requested, select an existing profile; create a local `new-game` entry only when there are no profiles loaded.
-- Publish output should be self-contained for the selected Windows runtime unless the user asks for framework-dependent deployment. Current publish packaging includes the virtual mouse driver package and driver install script when driver tooling is available.
+- Publish output should be self-contained single-file for the selected Windows runtime unless the user asks for framework-dependent deployment. Current publish packaging includes the virtual mouse driver package and driver install script when driver tooling is available.
 - Release tags use `vMAJOR.MINOR.PATCH`, for example `v0.1.1`. Tag pushes matching that shape build, test, package, and create a GitHub Release with `SteamHidBridge-win-x64.zip`.
-- The installer script lives at `scripts/install/app.ps1`, downloads from GitHub Releases, replaces the install folder, and creates a Desktop shortcut. User data must live outside the install folder.
+- The installer script lives at `scripts/install.ps1`, downloads from GitHub Releases, replaces the install folder, and creates a Desktop shortcut. User data must live outside the install folder.
 - App updates use GitHub Releases. The app checks the latest release, asks for confirmation, downloads the versioned `SteamHidBridge-update.ps1` release asset, closes all bridge instances, and replaces the published app folder. Do not bundle updater logic in the app package, and do not make the running process overwrite its own executable directly.
 - Runtime settings and logs belong under `%LOCALAPPDATA%\SteamHidBridge\`. Keep app lifecycle/error logging in `logs/app.log` and updater wrapper output in `logs/update.log`; do not add new ad hoc log files without a documented need.
 - Startup may refresh app-owned derived files: normalize/write `appsettings.json` through the settings store and regenerate the configured SRM manifest. Startup must not mutate Steam caches, SRM parser config, controller layouts, or Steam shortcut databases.
@@ -112,8 +112,8 @@ Use current official documentation for platform APIs, libraries, and tooling.
 - Shared C# protocol library for frame encoding, validation, and the HID input payload.
 - MSTest protocol tests for synthetic input and malformed-frame handling.
 - PlatformIO firmware placeholder for Teensy 4.0.
-- Scripts are grouped under `scripts/dev`, `scripts/driver`, `scripts/release`, and `scripts/install`. Do not add new flat scripts directly under `scripts/`. Local publish for testing lives at `scripts/dev/publish.ps1`; release packaging lives at `scripts/release/package.ps1`.
-- `scripts/release/deploy.ps1` is the local release gate. It prompts for the next version after printing the latest tag, runs formatting/build/test/package checks, requires a clean working tree, then creates and pushes the version tag that triggers the GitHub Release workflow.
+- Scripts expose a small top-level command surface: `scripts/check.ps1`, `scripts/publish.ps1`, `scripts/release.ps1`, and `scripts/install.ps1`. Helper scripts live under `scripts/internal/`. Do not add new public scripts without a strong workflow reason.
+- `scripts/release.ps1` is the local release gate. It prompts for the next version after printing the latest tag, runs formatting/build/test/package checks, requires a clean working tree, then creates and pushes the version tag that triggers the GitHub Release workflow.
 
 ## Steam Input Research Order
 

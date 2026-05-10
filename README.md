@@ -23,21 +23,20 @@ Prerequisites:
 - PlatformIO CLI for firmware work.
 
 ```powershell
-.\scripts\dev\build.ps1
-.\scripts\dev\test.ps1
-.\scripts\dev\publish.ps1
+.\scripts\check.ps1
+.\scripts\publish.ps1
 ```
 
-`dev/publish.ps1` creates a self-contained Windows build under `artifacts/SteamHidBridge-win-x64` and copies the virtual mouse driver package into `artifacts/SteamHidBridge-win-x64/driver`.
-`release/package.ps1` creates the release zip at `artifacts/SteamHidBridge-win-x64.zip`.
-`deploy.ps1` runs the release checks, creates a version tag, and pushes it to trigger the release workflow.
+`publish.ps1` creates a self-contained single-file Windows app under `artifacts/SteamHidBridge-win-x64` and copies the virtual mouse driver package into `artifacts/SteamHidBridge-win-x64/driver`.
+`release.ps1 -PackageOnly` creates the release zip at `artifacts/SteamHidBridge-win-x64.zip`.
+`release.ps1` without `-PackageOnly` runs the release checks, creates a version tag, and pushes it to trigger the release workflow.
 
 ## Install
 
 The release installer downloads the latest GitHub Release, asks for an install folder, replaces that folder with the self-contained app, and adds a Desktop shortcut.
 
 ```powershell
-irm https://raw.githubusercontent.com/mohdfareed/steam-hid-bridge/main/scripts/install/app.ps1 | iex
+irm https://raw.githubusercontent.com/mohdfareed/steam-hid-bridge/main/scripts/install.ps1 | iex
 ```
 
 Default install location:
@@ -87,10 +86,10 @@ Reboot after enabling test signing.
 
 ## Releases
 
-Run the deploy script from a clean working tree:
+Run the release script from a clean working tree:
 
 ```powershell
-.\scripts\release\deploy.ps1
+.\scripts\release.ps1
 ```
 
 It prints the latest version tag, prompts for the next version, formats the solution, verifies the tree is still clean, builds, tests, packages, then creates and pushes a `vMAJOR.MINOR.PATCH` tag.

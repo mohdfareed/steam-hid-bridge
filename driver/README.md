@@ -48,7 +48,7 @@ Windows x64 kernel drivers must be signed. This is not the same as a normal unsi
 Development flow:
 
 ```powershell
-.\scripts\driver\install.ps1 -EnableTestSigning -Sign
+.\artifacts\SteamHidBridge-win-x64\driver\install.ps1 -EnableTestSigning -Sign
 ```
 
 `-EnableTestSigning` runs `bcdedit /set testsigning on`; reboot after enabling it. `-Sign` creates/reuses a local test code-signing certificate, trusts it on the local machine, signs the driver catalog, adds the driver package with `pnputil`, and creates the root-enumerated test device with `devcon`.

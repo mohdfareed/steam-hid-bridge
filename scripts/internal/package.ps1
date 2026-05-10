@@ -11,7 +11,7 @@ $publishDir = Join-Path $root "artifacts\SteamHidBridge-$Runtime"
 $packagePath = Join-Path $root "artifacts\SteamHidBridge-$Runtime.zip"
 $updaterPath = Join-Path $root "artifacts\SteamHidBridge-update.ps1"
 
-& (Join-Path $root "scripts\dev\publish.ps1") -Configuration $Configuration -Runtime $Runtime -Version $Version -SkipDriver:$SkipDriver
+& (Join-Path $root "scripts\publish.ps1") -Configuration $Configuration -Runtime $Runtime -Version $Version -SkipDriver:$SkipDriver
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 if (Test-Path $packagePath) {
@@ -28,6 +28,6 @@ if (Test-Path $devSteamAppId) {
 }
 
 Compress-Archive -Path (Join-Path $publishDir "*") -DestinationPath $packagePath -CompressionLevel Optimal
-Copy-Item -LiteralPath (Join-Path $root "scripts\install\update.ps1") -Destination $updaterPath -Force
+Copy-Item -LiteralPath (Join-Path $root "scripts\internal\update.ps1") -Destination $updaterPath -Force
 Write-Host "Packaged to $packagePath"
 Write-Host "Updater asset at $updaterPath"
