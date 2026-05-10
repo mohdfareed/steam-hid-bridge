@@ -1,5 +1,6 @@
 param(
-    [string] $Runtime = "win-x64"
+    [string] $Runtime = "win-x64",
+    [switch] $SkipDriver
 )
 
 $ErrorActionPreference = "Stop"
@@ -47,7 +48,7 @@ function Get-LatestVersionTag {
     return "<none>"
 }
 
-$root = Split-Path -Parent $PSScriptRoot
+$root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 Set-Location $root
 
 git rev-parse --is-inside-work-tree | Out-Null
@@ -99,9 +100,9 @@ if ($remoteTagExitCode -ne 2) {
 
 Assert-CleanWorkTree
 
-Invoke-Checked "Build" { & (Join-Path $PSScriptRoot "build.ps1") -Configuration Release }
-Invoke-Checked "Test" { & (Join-Path $PSScriptRoot "test.ps1") -Configuration Release }
-Invoke-Checked "Package" { & (Join-Path $PSScriptRoot "package-release.ps1") -Configuration Release -Runtime $Runtime -Version $version }
+Invoke-Checked "Build" { & (Join-Path $root "scripts\dev\build.ps1") -Configuration Release }
+Invoke-Checked "Test" { & (Join-Path $root "scripts\dev\test.ps1") -Configuration Release }
+Invoke-Checked "Package" { & (Join-Path $PSScriptRoot "package.ps1") -Configuration Release -Runtime $Runtime -Version $version -SkipDriver:$SkipDriver }
 
 Assert-CleanWorkTree
 

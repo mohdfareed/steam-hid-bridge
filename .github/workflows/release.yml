@@ -52,15 +52,15 @@ jobs:
 
       - name: Build
         shell: pwsh
-        run: .\scripts\build.ps1 -Configuration Release
+        run: .\scripts\dev\build.ps1 -Configuration Release
 
       - name: Test
         shell: pwsh
-        run: .\scripts\test.ps1 -Configuration Release
+        run: .\scripts\dev\test.ps1 -Configuration Release
 
       - name: Package
         shell: pwsh
-        run: .\scripts\package-release.ps1 -Configuration Release -Runtime $env:RUNTIME -Version $env:VERSION
+        run: .\scripts\release\package.ps1 -Configuration Release -Runtime $env:RUNTIME -Version $env:VERSION -SkipDriver
 
       - name: Create GitHub release
         if: github.event_name == 'push'

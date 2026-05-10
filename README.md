@@ -10,7 +10,7 @@ Current MVP status: the Windows tray app works for profile launch, target proces
 app/        Windows bridge application
 protocol/   Host-device frame and HID report payloads
 firmware/   Teensy 4.0 placeholder firmware
-driver/     Reserved VHF/KMDF virtual HID software-output path
+driver/     VHF/KMDF virtual HID software-output spike
 tests/      Protocol tests
 scripts/    Build, test, publish, release helpers
 ```
@@ -23,13 +23,13 @@ Prerequisites:
 - PlatformIO CLI for firmware work.
 
 ```powershell
-.\scripts\build.ps1
-.\scripts\test.ps1
-.\scripts\publish.ps1
+.\scripts\dev\build.ps1
+.\scripts\dev\test.ps1
+.\scripts\dev\publish.ps1
 ```
 
-`publish.ps1` creates a self-contained Windows build under `artifacts/SteamHidBridge-win-x64`.
-`package-release.ps1` creates the release zip at `artifacts/SteamHidBridge-win-x64.zip`.
+`dev/publish.ps1` creates a self-contained Windows build under `artifacts/SteamHidBridge-win-x64` and copies the virtual mouse driver package into `artifacts/SteamHidBridge-win-x64/driver`.
+`release/package.ps1` creates the release zip at `artifacts/SteamHidBridge-win-x64.zip`.
 `deploy.ps1` runs the release checks, creates a version tag, and pushes it to trigger the release workflow.
 
 ## Install
@@ -37,7 +37,7 @@ Prerequisites:
 The release installer downloads the latest GitHub Release, asks for an install folder, replaces that folder with the self-contained app, and adds a Desktop shortcut.
 
 ```powershell
-irm https://raw.githubusercontent.com/mohdfareed/steam-hid-bridge/main/scripts/install.ps1 | iex
+irm https://raw.githubusercontent.com/mohdfareed/steam-hid-bridge/main/scripts/install/app.ps1 | iex
 ```
 
 Default install location:
@@ -69,6 +69,14 @@ Firmware build, once PlatformIO is installed:
 pio run -d .\firmware
 ```
 
+Driver install requires an elevated PowerShell session after publish:
+
+```powershell
+.\artifacts\SteamHidBridge-win-x64\driver\install.ps1 -EnableTestSigning -Sign
+```
+
+Reboot after enabling test signing.
+
 ## Steam Use
 
 1. Install or publish the Windows app.
@@ -82,7 +90,7 @@ pio run -d .\firmware
 Run the deploy script from a clean working tree:
 
 ```powershell
-.\scripts\deploy.ps1
+.\scripts\release\deploy.ps1
 ```
 
 It prints the latest version tag, prompts for the next version, formats the solution, verifies the tree is still clean, builds, tests, packages, then creates and pushes a `vMAJOR.MINOR.PATCH` tag.

@@ -2,7 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.IO;
 using System.Runtime.CompilerServices;
+using System.Threading.Tasks;
 using System.Windows.Input;
 using SteamHidBridge.App.Infrastructure;
 using SteamHidBridge.App.Input;
@@ -78,7 +80,9 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         SaveGeneralCommand = saveGeneralCommand;
         CheckForUpdateCommand = new AsyncRelayCommand(CheckForUpdateAsync);
         OpenAppDataCommand = new AsyncRelayCommand(OpenAppDataAsync);
+        InstallDriverCommand = new AsyncRelayCommand(InstallDriverAsync);
 
+        RefreshDriverStatus();
         ReloadGameIds(launchOptions.ProfileId);
         SetActivity($"Ready. profile={selectedGameId}");
         AppLog.Write($"settings={settingsStore.FilePath}");
@@ -104,6 +108,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     public ICommand SaveGeneralCommand { get; }
     public ICommand CheckForUpdateCommand { get; }
     public ICommand OpenAppDataCommand { get; }
+    public ICommand InstallDriverCommand { get; }
 
     public string SelectedGameId
     {
@@ -261,6 +266,18 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         private set => SetProperty(ref field, value);
     } = "Ready";
 
+    public string DriverStatusText
+    {
+        get;
+        private set => SetProperty(ref field, value);
+    } = "Not installed";
+
+    public string DriverStatusBrush
+    {
+        get;
+        private set => SetProperty(ref field, value);
+    } = "Crimson";
+
     public string PointerText => $"dx {lastReport.PointerDeltaX}, dy {lastReport.PointerDeltaY}";
     public string WheelText => $"wheel {lastReport.VerticalWheel}";
     public string MouseButtonsText => lastReport.MouseButtons == MouseButtons.None ? "buttons none" : $"buttons {lastReport.MouseButtons}";
@@ -290,6 +307,29 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private void SetError(string message)
     {
         SetActivity(message, isError: true);
+    }
+
+    private Task InstallDriverAsync()
+    {
+        try
+        {
+            VirtualMouseDriverInstaller.StartInstall();
+            SetActivity("Started driver installer.");
+        }
+        catch (Exception ex) when (ex is FileNotFoundException or InvalidOperationException or Win32Exception)
+        {
+            SetError($"Could not start driver installer: {ex.Message}");
+        }
+
+        RefreshDriverStatus();
+        return Task.CompletedTask;
+    }
+
+    private void RefreshDriverStatus()
+    {
+        bool installed = VirtualMouseDriverInstaller.IsInstalled();
+        DriverStatusText = installed ? "Installed" : "Not installed";
+        DriverStatusBrush = installed ? "SeaGreen" : "Crimson";
     }
 
     private void ApplyActivityMessage(string message, bool isError)

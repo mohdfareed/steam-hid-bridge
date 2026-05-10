@@ -19,6 +19,7 @@
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="104" />
@@ -178,15 +179,33 @@
                         ToolTip="Open the app data folder." />
 
                 <TextBlock Grid.Row="3"
-                           Text="Version"
+                           Text="Driver"
                            Margin="0,12,0,0"
                            VerticalAlignment="Center" />
                 <TextBlock Grid.Row="3"
                            Grid.Column="1"
-                           Text="{Binding VersionText}"
+                           Text="{Binding DriverStatusText}"
+                           Foreground="{Binding DriverStatusBrush}"
                            Margin="0,12,8,0"
                            VerticalAlignment="Center" />
                 <Button Grid.Row="3"
+                        Grid.Column="2"
+                        Width="160"
+                        Content="Install Driver"
+                        Margin="0,12,0,0"
+                        Command="{Binding InstallDriverCommand}"
+                        ToolTip="Open the virtual mouse driver installer as administrator." />
+
+                <TextBlock Grid.Row="4"
+                           Text="Version"
+                           Margin="0,12,0,0"
+                           VerticalAlignment="Center" />
+                <TextBlock Grid.Row="4"
+                           Grid.Column="1"
+                           Text="{Binding VersionText}"
+                           Margin="0,12,8,0"
+                           VerticalAlignment="Center" />
+                <Button Grid.Row="4"
                         Grid.Column="2"
                         Width="160"
                         Content="Check for Updates"
@@ -194,7 +213,7 @@
                         Command="{Binding CheckForUpdateCommand}"
                         ToolTip="Check GitHub Releases for a newer version." />
 
-                <Button Grid.Row="4"
+                <Button Grid.Row="5"
                         Grid.Column="2"
                         Width="160"
                         Content="Save"

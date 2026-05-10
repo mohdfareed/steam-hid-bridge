@@ -1,6 +1,6 @@
 # Software Output Driver
 
-This folder is reserved for a Windows virtual HID output path.
+This folder contains the Windows virtual HID output path.
 
 The intended implementation is a KMDF HID source driver using Microsoft's Virtual HID Framework (VHF). That is the closest clean Windows equivalent to a reWASD-style software output path for mouse and keyboard reports.
 
@@ -24,12 +24,11 @@ Steam legacy mouse output
 
 ## First Milestones
 
-1. Install Visual Studio driver tooling and the Windows Driver Kit.
-2. Create a minimal KMDF/VHF mouse-only driver.
-3. Expose a private control device or device interface for user-mode reports.
-4. Submit fixed-size mouse reports from a tiny console test client.
-5. Add the app-side output consumer only after the console client works.
-6. Measure latency and CPU before adding keyboard support.
+1. Build `SteamHidBridge.VirtualMouse` in Visual Studio.
+2. Install the root-enumerated test driver.
+3. Build and run `SteamHidBridge.VirtualMouse.TestSender`.
+4. Add the app-side output consumer only after the console client works.
+5. Measure latency and CPU before adding keyboard support.
 
 ## Non-Goals
 
@@ -40,4 +39,18 @@ Steam legacy mouse output
 
 ## Tooling Requirement
 
-This cannot be built with only the .NET SDK. It requires Windows Driver Kit/KMDF tooling and a driver signing plan.
+This cannot be built with only the .NET SDK. It targets Visual Studio 2026 with Windows Driver Kit 28000 tooling and requires a driver signing plan.
+
+## Signing And Install
+
+Windows x64 kernel drivers must be signed. This is not the same as a normal unsigned app warning that the user can click through.
+
+Development flow:
+
+```powershell
+.\scripts\driver\install.ps1 -EnableTestSigning -Sign
+```
+
+`-EnableTestSigning` runs `bcdedit /set testsigning on`; reboot after enabling it. `-Sign` creates/reuses a local test code-signing certificate, trusts it on the local machine, signs the driver catalog, adds the driver package with `pnputil`, and creates the root-enumerated test device with `devcon`.
+
+Release flow requires Microsoft-trusted driver signing, for example attestation signing through Partner Center. Until then, the packaged driver install script supports local test signing for development builds.
