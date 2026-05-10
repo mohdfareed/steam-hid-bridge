@@ -1,7 +1,6 @@
 <Solution>
   <Project Path="app/SteamHidBridge.App/SteamHidBridge.App.csproj" />
   <Project Path="driver/SteamHidBridge.VirtualMouse/SteamHidBridge.VirtualMouse.vcxproj" />
-  <Project Path="driver/SteamHidBridge.VirtualMouse.TestSender/SteamHidBridge.VirtualMouse.TestSender.vcxproj" />
   <Project Path="protocol/SteamHidBridge.Protocol/SteamHidBridge.Protocol.csproj" />
   <Project Path="protocol/SteamHidBridge.Protocol.Tests/SteamHidBridge.Protocol.Tests.csproj" />
 </Solution>

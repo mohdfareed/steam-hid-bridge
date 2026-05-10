@@ -14,7 +14,7 @@ The Windows app is the Steam-launched bridge host. It keeps Steam focused on the
 - Published builds are self-contained for the selected Windows runtime.
 - User data lives under `%LOCALAPPDATA%\SteamHidBridge`, outside the install folder.
 - The UI is organized into native WPF tabs for profile editing, general settings, output preview, and diagnostics.
-- The Settings tab stores input mode, output mode, Teensy serial port, Steam ROM Manager manifest path, app data access, driver install status, and release update actions.
+- The Settings tab stores input mode, output mode, board serial port, Steam ROM Manager manifest path, app data access, firmware update, driver install status, and release update actions.
 
 ## Folders
 
@@ -34,8 +34,8 @@ SteamHidBridge.App/
   "general": {
     "theme": "system",
     "inputMode": "legacyMouse",
-    "outputMode": "teensy",
-    "teensyPort": "auto",
+    "outputMode": "board",
+    "boardPort": "auto",
     "srmManifestPath": "%LOCALAPPDATA%\\SteamHidBridge\\srm\\games.json"
   },
   "games": {
@@ -52,11 +52,11 @@ SteamHidBridge.App/
 
 The app stores profiles at `%LOCALAPPDATA%\SteamHidBridge\appsettings.json`.
 
-`inputMode` is currently `legacyMouse` or `steamInputActions`. Legacy mouse is active. Steam Input actions are selectable in settings, but the native action reader still needs the app id/action manifest path repaired before it can emit frames.
+`inputMode` is `legacyMouse` or `steamInputActions`. The UI labels these as `Virtual Mouse` and `Steam Input`. `legacyMouse` observes Steam's virtual mouse output through Raw Input. `steamInputActions` polls the app's Steam Input game actions through Steamworks.NET; bind those actions in Steam's controller layout UI.
 
-`outputMode` is `visualizeOnly`, `teensy`, or `virtualMouseDriver`. The driver mode uses the packaged KMDF/VHF driver device interface when installed. Driver installation is disabled in the UI until the signing/test-mode path is resolved.
+`outputMode` is `visualizeOnly`, `board`, or `virtualMouseDriver`. The driver mode uses the packaged KMDF/VHF driver device interface when installed. Driver installation is disabled in the UI until the signing/test-mode path is resolved.
 
-`teensyPort` may be a COM port such as `COM7`, or `auto` to try available serial ports.
+`boardPort` is a COM port number such as `7`, or `auto` to try available serial ports. In the UI, leave the field empty for auto.
 
 The General section writes a Steam ROM Manager manifest JSON file for all profiles. By default this is `%LOCALAPPDATA%\SteamHidBridge\srm\games.json`, but the path is configurable in app settings so SRM configuration can live in a separate dotfiles or cloud-synced setup.
 

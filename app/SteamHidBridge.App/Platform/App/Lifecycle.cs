@@ -4,6 +4,7 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using SteamHidBridge.App.Configuration;
+using SteamHidBridge.App.Platform.Steam;
 
 namespace SteamHidBridge.App.Platform.App;
 
@@ -31,6 +32,19 @@ public static class StartupSync
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException or InvalidOperationException)
         {
             AppLog.WriteException("srm-manifest-sync-failed", ex);
+        }
+
+        if (settingsStore.Document.General.InputMode == BridgeInputMode.SteamInputActions)
+        {
+            try
+            {
+                SteamInputActionManifestResult result = SteamInputActionManifest.Write();
+                AppLog.Write($"steam input action manifest synced path={result.ManifestPath} controllerConfig={result.ControllerConfigPath ?? "<none>"} appId={result.AppId}");
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+            {
+                AppLog.WriteException("steam-input-action-manifest-sync-failed", ex);
+            }
         }
     }
 }

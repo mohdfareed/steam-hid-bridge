@@ -28,6 +28,7 @@
                       ToolTip="Select a saved profile." />
             <Button Grid.Column="2"
                     Content="New"
+                    HorizontalAlignment="Right"
                     Command="{Binding NewGameCommand}"
                     ToolTip="Create a new profile." />
 
@@ -95,7 +96,7 @@
                      Grid.ColumnSpan="2"
                      Margin="0,8,0,0"
                      Text="{Binding EditReceiverProcessesText, UpdateSourceTrigger=PropertyChanged}"
-                     ToolTip="Process names that enable forwarding when foreground. Separate multiple receivers with commas, semicolons, or new lines. Example: ExampleGame.exe, ExampleLauncher.exe" />
+                     ToolTip="Process names that enable forwarding when foreground. Separate multiple receivers with |, for example Game.exe | Launcher.exe." />
 
             <StackPanel Grid.Row="7"
                         Grid.Column="1"

@@ -33,6 +33,7 @@ public sealed class BridgeRuntime : IDisposable
     private bool isDisposed;
     private bool hasRequestedExit;
     private string inputSourceText = "Legacy mouse observer active.";
+    private BridgeInputMode inputMode = BridgeInputMode.LegacyMouse;
 
     public BridgeRuntime(BridgeLaunchOptions launchOptions, IEnumerable<IMouseInputConsumer> forwardingConsumers)
     {
@@ -50,17 +51,42 @@ public sealed class BridgeRuntime : IDisposable
     public event Action<string, bool>? ActivityChanged;
     public event Action<int>? ExitRequested;
 
-    public void PublishMouseInput(MouseInputFrame frame)
+    public void PublishLegacyMouseInput(MouseInputFrame frame)
     {
-        mouseInputRouter.Publish(frame);
+        if (inputMode == BridgeInputMode.LegacyMouse)
+        {
+            mouseInputRouter.Publish(frame);
+        }
+    }
+
+    public void PublishSteamInputMouseInput(MouseInputFrame frame)
+    {
+        if (inputMode == BridgeInputMode.SteamInputActions)
+        {
+            mouseInputRouter.Publish(frame);
+        }
     }
 
     public void SetInputMode(BridgeInputMode value)
     {
+        inputMode = value;
         inputSourceText = value == BridgeInputMode.LegacyMouse
-            ? "Legacy mouse observer active."
-            : "Steam Input actions selected; native action reader is not active yet.";
+            ? "Virtual Mouse active."
+            : "Steam Input actions active.";
         RefreshStatus();
+    }
+
+    public void SetInputStatus(string value, bool isError = false)
+    {
+        inputSourceText = value;
+        if (isError)
+        {
+            SetActivity(value, isError: true);
+        }
+        else
+        {
+            RefreshStatus();
+        }
     }
 
     public void SetProfile(string id, GameProfile value)

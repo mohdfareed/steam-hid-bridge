@@ -49,14 +49,14 @@ public sealed class AppSettingsStore(string path, AppSettings document)
         });
     }
 
-    public void SaveGeneral(AppTheme theme, BridgeInputMode inputMode, BridgeOutputMode outputMode, string teensyPort, string srmManifestPath)
+    public void SaveGeneral(AppTheme theme, BridgeInputMode inputMode, BridgeOutputMode outputMode, string boardPort, string srmManifestPath)
     {
         Save(latest =>
         {
             latest.General.Theme = theme;
             latest.General.InputMode = inputMode;
             latest.General.OutputMode = outputMode;
-            latest.General.TeensyPort = NormalizeTeensyPort(teensyPort);
+            latest.General.BoardPort = SerialPortSelection.Normalize(boardPort);
             latest.General.SrmManifestPath = srmManifestPath.Trim();
         });
     }
@@ -90,7 +90,7 @@ public sealed class AppSettingsStore(string path, AppSettings document)
             Document.General.Theme = latest.General.Theme;
             Document.General.InputMode = latest.General.InputMode;
             Document.General.OutputMode = latest.General.OutputMode;
-            Document.General.TeensyPort = latest.General.TeensyPort;
+            Document.General.BoardPort = latest.General.BoardPort;
             Document.General.SrmManifestPath = latest.General.SrmManifestPath;
             Document.Games.Clear();
             foreach ((string gameId, GameProfile gameProfile) in latest.Games)
@@ -129,10 +129,10 @@ public sealed class AppSettingsStore(string path, AppSettings document)
 
         if (!Enum.IsDefined(document.General.OutputMode))
         {
-            document.General.OutputMode = BridgeOutputMode.Teensy;
+            document.General.OutputMode = BridgeOutputMode.Board;
         }
 
-        document.General.TeensyPort = NormalizeTeensyPort(document.General.TeensyPort);
+        document.General.BoardPort = SerialPortSelection.Normalize(document.General.BoardPort);
         if (string.IsNullOrWhiteSpace(document.General.SrmManifestPath))
         {
             document.General.SrmManifestPath = AppDataPaths.SrmManifestPath;
@@ -140,11 +140,6 @@ public sealed class AppSettingsStore(string path, AppSettings document)
 
         document.Games ??= [];
         return document;
-    }
-
-    private static string NormalizeTeensyPort(string value)
-    {
-        return string.IsNullOrWhiteSpace(value) ? "auto" : value.Trim();
     }
 
     private static void WriteAtomic(string path, AppSettings document)

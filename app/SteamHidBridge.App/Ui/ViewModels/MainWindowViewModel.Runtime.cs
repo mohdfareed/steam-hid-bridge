@@ -17,8 +17,6 @@ public sealed partial class MainWindowViewModel
 
     private static string[] ParseReceiverProcesses(string value)
     {
-        return value.Split(
-            [',', ';', '\r', '\n'],
-            StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        return value.Split('|', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
     }
 }

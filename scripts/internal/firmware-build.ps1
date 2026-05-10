@@ -4,7 +4,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
-$firmwareDir = Join-Path $root "firmware"
+$firmwareDir = Join-Path $root "firmware\SteamHidBridge.Firmware"
 
 function Find-PlatformIO {
     $command = Get-Command "pio" -ErrorAction SilentlyContinue

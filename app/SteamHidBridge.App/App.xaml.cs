@@ -1,16 +1,16 @@
 using System;
-using System.IO;
 using System.Linq;
 using System.Windows;
 using System.Windows.Threading;
 using SteamHidBridge.App.Configuration;
 using SteamHidBridge.App.Core.Output;
 using SteamHidBridge.App.Core.Runtime;
+using SteamHidBridge.App.Platform;
 using SteamHidBridge.App.Platform.App;
+using SteamHidBridge.App.Platform.Steam;
 using SteamHidBridge.App.Platform.Windows;
 using SteamHidBridge.App.Ui.ViewModels;
 using SteamHidBridge.App.Ui.Views;
-using SteamHidBridge.App.Update;
 
 [assembly: ThemeInfo(ResourceDictionaryLocation.None, ResourceDictionaryLocation.SourceAssembly)]
 
@@ -22,6 +22,7 @@ public partial class App : Application
     private MainWindowViewModel? mainWindowViewModel;
     private BridgeRuntime? bridgeRuntime;
     private MouseOutputRouter? mouseOutputRouter;
+    private SteamInputMouseEmitter? steamInputMouseEmitter;
     private ShutdownSignalListener? shutdownSignalListener;
     private RawMouseInputWindowHook? rawMouseInputWindowHook;
     private bool hideMainWindowToTrayOnClose;
@@ -49,19 +50,21 @@ public partial class App : Application
             StartupSync.Run(settingsStore);
             AppThemeManager.Apply(settingsStore.Document.General.Theme);
 
-            mouseOutputRouter = new MouseOutputRouter(settingsStore.Document.General.OutputMode, settingsStore.Document.General.TeensyPort);
+            mouseOutputRouter = new MouseOutputRouter(settingsStore.Document.General.OutputMode, settingsStore.Document.General.BoardPort);
             bridgeRuntime = new BridgeRuntime(launchOptions, [mouseOutputRouter]);
-            bridgeRuntime.SetInputMode(settingsStore.Document.General.InputMode);
+            steamInputMouseEmitter = new SteamInputMouseEmitter(bridgeRuntime.PublishSteamInputMouseInput, bridgeRuntime.SetInputStatus);
+            ApplyInputMode(settingsStore.Document.General.InputMode);
             mainWindowViewModel = new MainWindowViewModel(
                 launchOptions,
                 settingsStore,
                 bridgeRuntime,
-                bridgeRuntime.SetInputMode,
+                ApplyInputMode,
                 mouseOutputRouter.SetMode,
-                mouseOutputRouter.SetTeensyPort,
+                mouseOutputRouter.SetBoardPort,
                 AppThemeManager.Apply,
                 ConfirmUpdate,
                 action => Dispatcher.BeginInvoke(action));
+
             mainWindowViewModel.ExitRequested += ExitApplication;
             shutdownSignalListener = new ShutdownSignalListener(() => Dispatcher.BeginInvoke(() => ExitApplication(0)));
 
@@ -75,7 +78,7 @@ public partial class App : Application
             MainWindow = window;
 
             trayIconHost = new TrayIconHost(window, mainWindowViewModel.TrayText, () => ExitApplication(0));
-            rawMouseInputWindowHook = new RawMouseInputWindowHook(window, bridgeRuntime.PublishMouseInput);
+            rawMouseInputWindowHook = new RawMouseInputWindowHook(window, bridgeRuntime.PublishLegacyMouseInput);
             if (launchOptions.LaunchGame)
             {
                 window.Show();
@@ -99,11 +102,14 @@ public partial class App : Application
     protected override void OnExit(ExitEventArgs e)
     {
         isExiting = true;
+
         bridgeRuntime?.Dispose();
         mouseOutputRouter?.Dispose();
+        steamInputMouseEmitter?.Dispose();
         trayIconHost?.Dispose();
         shutdownSignalListener?.Dispose();
         rawMouseInputWindowHook?.Dispose();
+
         AppLog.Write($"exit code={e.ApplicationExitCode}");
         base.OnExit(e);
     }
@@ -145,6 +151,12 @@ public partial class App : Application
 
         isExiting = true;
         Shutdown(exitCode);
+    }
+
+    private void ApplyInputMode(BridgeInputMode inputMode)
+    {
+        bridgeRuntime?.SetInputMode(inputMode);
+        steamInputMouseEmitter?.SetEnabled(inputMode == BridgeInputMode.SteamInputActions);
     }
 
     private void OnDispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)

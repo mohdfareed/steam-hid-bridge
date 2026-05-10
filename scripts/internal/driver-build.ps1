@@ -78,7 +78,6 @@ if ($Platform -ne "x64") {
 $repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $driverDir = Join-Path $repoRoot "driver\SteamHidBridge.VirtualMouse"
 $driverProject = Join-Path $driverDir "SteamHidBridge.VirtualMouse.vcxproj"
-$senderProject = Join-Path $repoRoot "driver\SteamHidBridge.VirtualMouse.TestSender\SteamHidBridge.VirtualMouse.TestSender.vcxproj"
 $driverOut = Join-Path $repoRoot "driver\SteamHidBridge.VirtualMouse\obj\$Platform\$Configuration"
 $driverObj = Join-Path $repoRoot "driver\SteamHidBridge.VirtualMouse\obj\$Platform\$Configuration"
 $wdkRoot = Join-Path $env:USERPROFILE ".nuget\packages\microsoft.windows.wdk.x64\10.0.28000.1839\c"
@@ -130,9 +129,4 @@ Invoke-QuietNative "Stamping virtual mouse driver INF" {
 
 Invoke-QuietNative "Generating virtual mouse driver catalog" {
     & $inf2cat /driver:$driverOut /os:10_X64
-}
-
-& $msbuild $senderProject /nologo /v:quiet /restore /m /p:Configuration=$Configuration /p:Platform=$Platform
-if ($LASTEXITCODE -ne 0) {
-    throw "Driver test sender build failed."
 }

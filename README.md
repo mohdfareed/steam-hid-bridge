@@ -14,7 +14,8 @@ Steam Input remains the configuration layer; this project handles profile launch
   * Accurate launch state tracking allows Steam to reliably start and stop games.
   * Foreground gating such that input is only sent when the game is active.
   * Steam Input configurations to reliably activate when the game is active.
-* Forwards mouse events to a selected output mode: visualization only, Teensy 4.0 USB HID, or the packaged virtual mouse driver.
+* Reads mouse events from either Steam's virtual mouse output or Steam Input game actions.
+* Forwards mouse events to a selected output mode: none, physical board HID, or the packaged virtual mouse driver.
 * Consistent shortcuts allows for Steam Cloud sync of Steam Input configurations (*undocumented/unreliable*).
 
 ## Install
@@ -63,7 +64,7 @@ dotnet run --project .\app\SteamHidBridge.App -- --profile game-profile --launch
 ```text
 app/        Windows bridge application
 protocol/   Host-device frame and HID report payloads
-firmware/   Teensy 4.0 firmware
+firmware/   Board firmware; current target is Teensy 4.0
 driver/     VHF/KMDF virtual mouse driver package
 tests/      Protocol tests
 scripts/    Build, check, publish, release, install helpers
@@ -82,16 +83,16 @@ Prerequisites:
 .\scripts\publish.ps1
 ```
 
-`check.ps1` verifies formatting, builds the app/protocol projects, runs tests, builds the virtual driver, and builds the Teensy firmware.
-`publish.ps1` creates a self-contained single-file Windows app under `artifacts/SteamHidBridge-win-x64` and includes the driver and firmware artifacts.
+`check.ps1` verifies formatting, builds the app/protocol projects, runs tests, builds the virtual driver, and builds the board firmware.
+`publish.ps1` creates a self-contained single-file Windows app under `artifacts/SteamHidBridge-win-x64` and includes `Driver`, `Firmware`, and `Steam` artifacts.
 `release.ps1` creates the release zip at `artifacts/SteamHidBridge-win-x64.zip`.
 `release.ps1 -TagRelease` runs the release checks, creates a version tag, and pushes it to trigger the release workflow.
 
 Firmware build/upload:
 
 ```powershell
-pio run -d .\firmware
-pio run -d .\firmware -t upload
+pio run -d .\firmware\SteamHidBridge.Firmware
+pio run -d .\firmware\SteamHidBridge.Firmware -t upload
 ```
 
 ## Releases

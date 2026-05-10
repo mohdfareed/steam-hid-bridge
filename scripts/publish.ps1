@@ -42,22 +42,28 @@ if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 & (Join-Path $root "scripts\internal\driver-build.ps1") -Configuration $Configuration -Platform x64
 
 $driverSource = Join-Path $root "driver\SteamHidBridge.VirtualMouse\obj\x64\$Configuration"
-$senderSource = Join-Path $root "driver\SteamHidBridge.VirtualMouse.TestSender\obj\x64\$Configuration"
-$driverDest = Join-Path $output "driver"
+$driverDest = Join-Path $output "Driver"
 New-Item -ItemType Directory -Force -Path $driverDest | Out-Null
 
 Copy-Item -LiteralPath (Join-Path $driverSource "SteamHidBridge.VirtualMouse.inf") -Destination $driverDest -Force
 Copy-Item -LiteralPath (Join-Path $driverSource "SteamHidBridge.VirtualMouse.sys") -Destination $driverDest -Force
 Copy-Item -LiteralPath (Join-Path $driverSource "steamhidbridge.virtualmouse.cat") -Destination (Join-Path $driverDest "SteamHidBridge.VirtualMouse.cat") -Force
-Copy-Item -LiteralPath (Join-Path $senderSource "SteamHidBridge.VirtualMouse.TestSender.exe") -Destination $driverDest -Force
 Copy-Item -LiteralPath (Join-Path $root "scripts\internal\driver-install.ps1") -Destination (Join-Path $driverDest "install.ps1") -Force
 
 & (Join-Path $root "scripts\internal\firmware-build.ps1") -Environment teensy40
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-$firmwareSource = Join-Path $root "firmware\.pio\build\teensy40\firmware.hex"
-$firmwareDest = Join-Path $output "firmware"
+$firmwareSource = Join-Path $root "firmware\SteamHidBridge.Firmware\.pio\build\teensy40\firmware.hex"
+$firmwareDest = Join-Path $output "Firmware"
 New-Item -ItemType Directory -Force -Path $firmwareDest | Out-Null
-Copy-Item -LiteralPath $firmwareSource -Destination (Join-Path $firmwareDest "SteamHidBridge.Teensy40.hex") -Force
+Copy-Item -LiteralPath $firmwareSource -Destination (Join-Path $firmwareDest "SteamHidBridge.Board.hex") -Force
+
+$teensyToolDir = Join-Path $env:USERPROFILE ".platformio\packages\tool-teensy"
+foreach ($toolName in @("teensy.exe", "teensy_post_compile.exe", "teensy_reboot.exe")) {
+    $toolPath = Join-Path $teensyToolDir $toolName
+    if (Test-Path -LiteralPath $toolPath) {
+        Copy-Item -LiteralPath $toolPath -Destination $firmwareDest -Force
+    }
+}
 
 Write-Host "Published to $output"

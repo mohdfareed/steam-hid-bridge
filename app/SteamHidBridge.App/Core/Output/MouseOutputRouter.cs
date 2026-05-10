@@ -5,10 +5,10 @@ using SteamHidBridge.App.Core.Input;
 
 namespace SteamHidBridge.App.Core.Output;
 
-public sealed class MouseOutputRouter(BridgeOutputMode outputMode, string teensyPort) : IMouseInputConsumer, IOutputStatusProvider, IDisposable
+public sealed class MouseOutputRouter(BridgeOutputMode outputMode, string boardPort) : IMouseInputConsumer, IOutputStatusProvider, IDisposable
 {
     private readonly Lock syncLock = new();
-    private readonly TeensySerialMouseOutput teensyOutput = new(teensyPort);
+    private readonly BoardSerialMouseOutput boardOutput = new(boardPort);
     private readonly VirtualMouseDriverOutput driverOutput = new();
     private BridgeOutputMode outputMode = outputMode;
     private bool isDisposed;
@@ -22,7 +22,7 @@ public sealed class MouseOutputRouter(BridgeOutputMode outputMode, string teensy
                 return outputMode switch
                 {
                     BridgeOutputMode.VisualizeOnly => "Visualize only",
-                    BridgeOutputMode.Teensy => teensyOutput.StatusText,
+                    BridgeOutputMode.Board => boardOutput.StatusText,
                     BridgeOutputMode.VirtualMouseDriver => driverOutput.StatusText,
                     _ => "Unknown output mode"
                 };
@@ -38,9 +38,9 @@ public sealed class MouseOutputRouter(BridgeOutputMode outputMode, string teensy
         }
     }
 
-    public void SetTeensyPort(string value)
+    public void SetBoardPort(string value)
     {
-        teensyOutput.SetPort(value);
+        boardOutput.SetPort(value);
     }
 
     public void Refresh()
@@ -54,8 +54,8 @@ public sealed class MouseOutputRouter(BridgeOutputMode outputMode, string teensy
 
             switch (outputMode)
             {
-                case BridgeOutputMode.Teensy:
-                    teensyOutput.Refresh();
+                case BridgeOutputMode.Board:
+                    boardOutput.Refresh();
                     break;
                 case BridgeOutputMode.VirtualMouseDriver:
                     driverOutput.Refresh();
@@ -75,8 +75,8 @@ public sealed class MouseOutputRouter(BridgeOutputMode outputMode, string teensy
 
             switch (outputMode)
             {
-                case BridgeOutputMode.Teensy:
-                    teensyOutput.Consume(frame);
+                case BridgeOutputMode.Board:
+                    boardOutput.Consume(frame);
                     break;
                 case BridgeOutputMode.VirtualMouseDriver:
                     driverOutput.Consume(frame);
@@ -90,7 +90,7 @@ public sealed class MouseOutputRouter(BridgeOutputMode outputMode, string teensy
         lock (syncLock)
         {
             isDisposed = true;
-            teensyOutput.Dispose();
+            boardOutput.Dispose();
             driverOutput.Dispose();
         }
     }

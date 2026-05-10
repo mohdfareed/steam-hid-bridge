@@ -24,11 +24,10 @@ Steam legacy mouse output
 
 ## First Milestones
 
-1. Build `SteamHidBridge.VirtualMouse` in Visual Studio.
+1. Build `SteamHidBridge.VirtualMouse`.
 2. Install the root-enumerated test driver.
-3. Build and run `SteamHidBridge.VirtualMouse.TestSender`.
-4. Add the app-side output consumer only after the console client works.
-5. Measure latency and CPU before adding keyboard support.
+3. Use the app's Virtual Mouse output mode to send mouse frames to the driver.
+4. Measure latency and CPU before adding keyboard support.
 
 ## Non-Goals
 
@@ -48,9 +47,19 @@ Windows x64 kernel drivers must be signed. This is not the same as a normal unsi
 Development flow:
 
 ```powershell
-.\artifacts\SteamHidBridge-win-x64\driver\install.ps1 -EnableTestSigning -Sign
+.\artifacts\SteamHidBridge-win-x64\Driver\install.ps1 -EnableTestSigning -Sign
 ```
 
 `-EnableTestSigning` runs `bcdedit /set testsigning on`; reboot after enabling it. `-Sign` creates/reuses a local test code-signing certificate, trusts it on the local machine, signs the driver catalog, adds the driver package with `pnputil`, and creates the root-enumerated test device with `devcon`.
 
 Release flow requires Microsoft-trusted driver signing, for example attestation signing through Partner Center. Until then, the packaged driver install script supports local test signing for development builds.
+
+## Project
+
+The driver project lives under:
+
+```text
+driver\SteamHidBridge.VirtualMouse\
+```
+
+It currently exposes a mouse-only VHF device with relative X/Y movement, five buttons, vertical wheel, and one IOCTL for submitting a complete mouse report. Keyboard support is not implemented yet.

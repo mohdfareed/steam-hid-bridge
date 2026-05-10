@@ -1,6 +1,6 @@
 # Firmware
 
-The firmware is the Teensy-side HID emitter. It should validate host frames, reject malformed input, emit keyboard and mouse HID reports, and expose recoverable diagnostics without requiring a reflash.
+The firmware is the Teensy-side HID emitter. It should validate host frames, reject malformed input, emit keyboard and mouse HID reports, and expose recoverable diagnostics without requiring a re-flash.
 
 ## Target
 
@@ -12,20 +12,20 @@ The firmware is the Teensy-side HID emitter. It should validate host frames, rej
 ## Build
 
 ```powershell
-pio run -d .\firmware
+pio run -d .\firmware\SteamHidBridge.Firmware
 ```
 
 PlatformIO must be installed separately.
 `scripts/check.ps1` and `scripts/publish.ps1` also build this firmware. Publish copies the generated hex to:
 
 ```text
-artifacts\SteamHidBridge-win-x64\firmware\SteamHidBridge.Teensy40.hex
+artifacts\SteamHidBridge-win-x64\Firmware\SteamHidBridge.Board.hex
 ```
 
 Upload to the board:
 
 ```powershell
-pio run -d .\firmware -t upload
+pio run -d .\firmware\SteamHidBridge.Firmware -t upload
 ```
 
 The firmware listens on the Teensy USB serial interface at `115200` baud and emits mouse HID reports for validated bridge frames.

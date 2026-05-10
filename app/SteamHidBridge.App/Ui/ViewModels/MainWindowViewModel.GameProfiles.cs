@@ -6,6 +6,7 @@ using System.Text.Json;
 using System.Threading.Tasks;
 using SteamHidBridge.App.Configuration;
 using SteamHidBridge.App.Platform.App;
+using SteamHidBridge.App.Platform.Steam;
 
 namespace SteamHidBridge.App.Ui.ViewModels;
 
@@ -66,19 +67,44 @@ public sealed partial class MainWindowViewModel
 
     private Task SaveGeneralAsync()
     {
-        settingsStore.SaveGeneral(SelectedTheme, SelectedInputMode, SelectedOutputMode, TeensyPort, SrmManifestPath);
+        settingsStore.SaveGeneral(SelectedTheme, SelectedInputMode, SelectedOutputMode, BoardPort, SrmManifestPath);
         applyInputMode(settingsStore.Document.General.InputMode);
         applyOutputMode(settingsStore.Document.General.OutputMode);
-        applyTeensyPort(settingsStore.Document.General.TeensyPort);
+        applyBoardPort(settingsStore.Document.General.BoardPort);
         savedTheme = settingsStore.Document.General.Theme;
         savedInputMode = settingsStore.Document.General.InputMode;
         savedOutputMode = settingsStore.Document.General.OutputMode;
-        savedTeensyPort = settingsStore.Document.General.TeensyPort;
+        savedBoardPort = settingsStore.Document.General.BoardPort;
         savedSrmManifestPath = settingsStore.Document.General.SrmManifestPath;
         saveGeneralCommand.RaiseCanExecuteChanged();
         if (WriteSrmManifest())
         {
             SetActivity($"Saved general settings and wrote Steam ROM Manager manifest for {settingsStore.Document.Games.Count} profile(s).");
+        }
+
+        if (SelectedInputMode == BridgeInputMode.SteamInputActions)
+        {
+            _ = WriteSteamInputActions();
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private Task ExportSrmManifestAsync()
+    {
+        if (WriteSrmManifest())
+        {
+            SetActivity($"Wrote Steam ROM Manager manifest for {settingsStore.Document.Games.Count} profile(s).");
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private Task ApplySteamInputActionsAsync()
+    {
+        if (WriteSteamInputActions())
+        {
+            SetActivity("Wrote Steam Input action manifest.");
         }
 
         return Task.CompletedTask;
@@ -105,6 +131,22 @@ public sealed partial class MainWindowViewModel
         return Task.CompletedTask;
     }
 
+    private async Task UpdateFirmwareAsync()
+    {
+        try
+        {
+            SetActivity("Updating board firmware. Press the board program button if requested.");
+            await boardFirmwareUpdater.UpdateAsync().ConfigureAwait(true);
+            SetActivity("Board firmware update completed.");
+            OnPropertyChanged(nameof(BoardFirmwareText));
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            SetError($"Board firmware update failed: {ex.Message}");
+            OnPropertyChanged(nameof(BoardFirmwareText));
+        }
+    }
+
     private bool WriteSrmManifest()
     {
         try
@@ -116,6 +158,27 @@ public sealed partial class MainWindowViewModel
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException or InvalidOperationException)
         {
             SetError($"Could not write Steam ROM Manager manifest: {ex.Message}");
+            return false;
+        }
+    }
+
+    private bool WriteSteamInputActions()
+    {
+        try
+        {
+            SteamInputActionManifestResult result = SteamInputActionManifest.Write();
+            AppLog.Write($"steam input action manifest written path={result.ManifestPath} controllerConfig={result.ControllerConfigPath ?? "<none>"} appId={result.AppId}");
+            if (string.IsNullOrWhiteSpace(result.AppId))
+            {
+                SetError("Wrote local Steam Input action manifest, but Steam did not provide an app id for controller_config export.");
+                return false;
+            }
+
+            return true;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            SetError($"Could not write Steam Input actions: {ex.Message}");
             return false;
         }
     }
@@ -211,16 +274,16 @@ public sealed partial class MainWindowViewModel
         editExecutable = profile.Executable;
         editArguments = profile.Arguments;
         editWorkingDirectory = profile.WorkingDirectory;
-        editReceiverProcessesText = string.Join(", ", profile.ReceiverProcesses);
+        editReceiverProcessesText = string.Join(" | ", profile.ReceiverProcesses);
         srmManifestPath = settingsStore.Document.General.SrmManifestPath;
-        teensyPort = settingsStore.Document.General.TeensyPort;
+        boardPort = SerialPortSelection.ToUiText(settingsStore.Document.General.BoardPort);
         selectedInputMode = settingsStore.Document.General.InputMode;
         selectedOutputMode = settingsStore.Document.General.OutputMode;
         selectedTheme = settingsStore.Document.General.Theme;
         savedGameId = gameId;
         savedProfile = CloneProfile(profile);
         savedSrmManifestPath = srmManifestPath;
-        savedTeensyPort = teensyPort;
+        savedBoardPort = boardPort;
         savedInputMode = selectedInputMode;
         savedOutputMode = selectedOutputMode;
         savedTheme = selectedTheme;
@@ -234,13 +297,14 @@ public sealed partial class MainWindowViewModel
         OnPropertyChanged(nameof(EditWorkingDirectory));
         OnPropertyChanged(nameof(EditReceiverProcessesText));
         OnPropertyChanged(nameof(SrmManifestPath));
-        OnPropertyChanged(nameof(TeensyPort));
+        OnPropertyChanged(nameof(BoardPort));
         OnPropertyChanged(nameof(SelectedInputMode));
         OnPropertyChanged(nameof(SelectedOutputMode));
         OnPropertyChanged(nameof(SelectedTheme));
         OnPropertyChanged(nameof(ProfileText));
         OnPropertyChanged(nameof(ReceiverProcessesText));
         RaiseProfileCommandStateChanged();
+        applySteamInputActionsCommand.RaiseCanExecuteChanged();
         saveGeneralCommand.RaiseCanExecuteChanged();
     }
 
@@ -292,5 +356,10 @@ public sealed partial class MainWindowViewModel
             && string.Equals(left.Arguments, right.Arguments, StringComparison.Ordinal)
             && string.Equals(left.WorkingDirectory, right.WorkingDirectory, StringComparison.Ordinal)
             && left.ReceiverProcesses.SequenceEqual(right.ReceiverProcesses, StringComparer.Ordinal);
+    }
+
+    private bool CanApplySteamInputActions()
+    {
+        return SelectedInputMode == BridgeInputMode.SteamInputActions;
     }
 }

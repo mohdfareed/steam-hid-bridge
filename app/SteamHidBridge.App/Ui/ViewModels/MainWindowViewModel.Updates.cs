@@ -1,6 +1,6 @@
 using System;
 using System.Threading.Tasks;
-using SteamHidBridge.App.Update;
+using SteamHidBridge.App.Platform;
 
 namespace SteamHidBridge.App.Ui.ViewModels;
 

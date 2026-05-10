@@ -14,6 +14,9 @@
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="120" />
@@ -37,8 +40,10 @@
                       Grid.ColumnSpan="2"
                       Margin="0,8,0,0"
                       ItemsSource="{Binding InputModeOptions}"
-                      SelectedItem="{Binding SelectedInputMode}"
-                      ToolTip="Choose legacy mouse observation or native Steam Input actions." />
+                      DisplayMemberPath="Label"
+                      SelectedValuePath="Value"
+                      SelectedValue="{Binding SelectedInputMode}"
+                      ToolTip="Virtual Mouse observes Steam's virtual mouse output. Steam Input reads game actions; bind the actions in Steam Input." />
 
             <TextBlock Grid.Row="2"
                        Text="Output"
@@ -49,19 +54,24 @@
                       Grid.ColumnSpan="2"
                       Margin="0,8,0,0"
                       ItemsSource="{Binding OutputModeOptions}"
-                      SelectedItem="{Binding SelectedOutputMode}"
-                      ToolTip="Choose visualization only, Teensy board output, or the virtual mouse driver." />
+                      DisplayMemberPath="Label"
+                      SelectedValuePath="Value"
+                      SelectedValue="{Binding SelectedOutputMode}"
+                      ToolTip="Choose no physical output, board physical mouse output, or the virtual mouse driver." />
 
             <TextBlock Grid.Row="3"
-                       Text="Teensy port"
+                       Text="Board port"
                        Margin="0,8,0,0"
                        VerticalAlignment="Center" />
             <TextBox Grid.Row="3"
                      Grid.Column="1"
                      Grid.ColumnSpan="2"
                      Margin="0,8,0,0"
-                     Text="{Binding TeensyPort, UpdateSourceTrigger=PropertyChanged}"
-                     ToolTip="COM port for the Teensy, or auto to try available serial ports." />
+                     InputScope="Number"
+                     Text="{Binding BoardPort, UpdateSourceTrigger=PropertyChanged}"
+                     PreviewTextInput="BoardPort_PreviewTextInput"
+                     DataObject.Pasting="BoardPort_Pasting"
+                     ToolTip="Enter the COM port number only. Leave empty for Auto." />
 
             <TextBlock Grid.Row="4"
                        Text="SRM manifest"
@@ -69,62 +79,100 @@
                        VerticalAlignment="Center" />
             <TextBox Grid.Row="4"
                      Grid.Column="1"
-                     Grid.ColumnSpan="2"
-                     Margin="0,8,0,0"
+                     Margin="0,8,8,0"
                      Text="{Binding SrmManifestPath, UpdateSourceTrigger=PropertyChanged}"
                      ToolTip="Manifest JSON path used by your Steam ROM Manager parser." />
+            <Button Grid.Row="4"
+                    Grid.Column="2"
+                    Content="Export SRM"
+                    Margin="0,8,0,0"
+                    Command="{Binding ExportSrmManifestCommand}"
+                    ToolTip="Write the Steam ROM Manager manifest now." />
 
             <TextBlock Grid.Row="5"
+                       Text="Steam actions"
+                     Margin="0,8,0,0"
+                       VerticalAlignment="Center" />
+            <TextBlock Grid.Row="5"
+                       Grid.Column="1"
+                       Text="Available when Input is Steam Input."
+                       Margin="0,8,8,0"
+                       VerticalAlignment="Center" />
+            <Button Grid.Row="5"
+                    Grid.Column="2"
+                    Content="Apply"
+                    Margin="0,8,0,0"
+                    Command="{Binding ApplySteamInputActionsCommand}"
+                    ToolTip="Write the Steam Input action manifest so Steam can show the bridge mouse actions." />
+
+            <TextBlock Grid.Row="6"
                        Text="App data"
                        Margin="0,8,0,0"
                        VerticalAlignment="Center" />
-            <TextBox Grid.Row="5"
+            <TextBox Grid.Row="6"
                      Grid.Column="1"
                      Margin="0,8,8,0"
                      Text="{Binding AppDataPath, Mode=OneWay}"
                      IsReadOnly="True"
                      ToolTip="Folder containing appsettings.json, logs, and generated data." />
-            <Button Grid.Row="5"
+            <Button Grid.Row="6"
                     Grid.Column="2"
                     Content="Open"
                     Margin="0,8,0,0"
                     Command="{Binding OpenAppDataCommand}"
                     ToolTip="Open the app data folder." />
 
-            <TextBlock Grid.Row="6"
+            <TextBlock Grid.Row="7"
+                       Text="Board firmware"
+                       Margin="0,12,0,0"
+                       VerticalAlignment="Center" />
+            <TextBlock Grid.Row="7"
+                       Grid.Column="1"
+                       Text="{Binding BoardFirmwareText}"
+                       Margin="0,12,8,0"
+                       VerticalAlignment="Center"
+                       TextWrapping="Wrap" />
+            <Button Grid.Row="7"
+                    Grid.Column="2"
+                    Content="Update"
+                    Margin="0,12,0,0"
+                    Command="{Binding UpdateFirmwareCommand}"
+                    ToolTip="Flash the board with the firmware bundled with this app." />
+
+            <TextBlock Grid.Row="8"
                        Text="Virtual driver"
                        Margin="0,12,0,0"
                        VerticalAlignment="Center" />
-            <TextBlock Grid.Row="6"
+            <TextBlock Grid.Row="8"
                        Grid.Column="1"
                        Text="{Binding DriverInstallText}"
                        Margin="0,12,8,0"
                        VerticalAlignment="Center"
                        TextWrapping="Wrap" />
-            <Button Grid.Row="6"
+            <Button Grid.Row="8"
                     Grid.Column="2"
                     Content="Install"
                     Margin="0,12,0,0"
                     Command="{Binding InstallDriverCommand}"
                     ToolTip="Driver install is disabled until signing/test-mode setup is resolved." />
 
-            <TextBlock Grid.Row="7"
+            <TextBlock Grid.Row="9"
                        Text="Version"
                        Margin="0,12,0,0"
                        VerticalAlignment="Center" />
-            <TextBlock Grid.Row="7"
+            <TextBlock Grid.Row="9"
                        Grid.Column="1"
                        Text="{Binding VersionText}"
                        Margin="0,12,8,0"
                        VerticalAlignment="Center" />
-            <Button Grid.Row="7"
+            <Button Grid.Row="9"
                     Grid.Column="2"
                     Content="Check Updates"
                     Margin="0,12,0,0"
                     Command="{Binding CheckForUpdateCommand}"
                     ToolTip="Check GitHub Releases for a newer version." />
 
-            <Button Grid.Row="8"
+            <Button Grid.Row="10"
                     Grid.Column="2"
                     Content="Save"
                     Margin="0,8,0,0"

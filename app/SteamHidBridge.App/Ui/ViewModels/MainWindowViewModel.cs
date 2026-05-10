@@ -2,29 +2,30 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
-using System.IO;
 using System.Runtime.CompilerServices;
-using System.Threading.Tasks;
 using System.Windows.Input;
 using SteamHidBridge.App.Configuration;
-using SteamHidBridge.App.Core.Input;
 using SteamHidBridge.App.Core.Runtime;
+using SteamHidBridge.App.Platform;
 using SteamHidBridge.App.Platform.App;
-using SteamHidBridge.App.Update;
+using SteamHidBridge.App.Platform.Board;
 using SteamHidBridge.Protocol;
 
 namespace SteamHidBridge.App.Ui.ViewModels;
 
 public sealed partial class MainWindowViewModel : INotifyPropertyChanged
 {
+    public sealed record SettingOption<T>(T Value, string Label);
+
     private readonly BridgeLaunchOptions launchOptions;
     private readonly AppSettingsStore settingsStore;
     private readonly BridgeRuntime runtime;
     private readonly SrmManifestWriter srmManifestWriter;
     private readonly AppUpdater appUpdater;
+    private readonly BoardFirmwareUpdater boardFirmwareUpdater;
     private readonly Action<BridgeInputMode> applyInputMode;
     private readonly Action<BridgeOutputMode> applyOutputMode;
-    private readonly Action<string> applyTeensyPort;
+    private readonly Action<string> applyBoardPort;
     private readonly Action<AppTheme> applyTheme;
     private readonly Func<AppUpdateCheckResult, bool> confirmUpdate;
     private readonly Action<Action> dispatch;
@@ -39,13 +40,13 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private string editWorkingDirectory = string.Empty;
     private string editReceiverProcessesText = string.Empty;
     private string srmManifestPath = string.Empty;
-    private string teensyPort = string.Empty;
+    private string boardPort = string.Empty;
     private BridgeInputMode selectedInputMode;
     private BridgeOutputMode selectedOutputMode;
     private string savedGameId = string.Empty;
     private GameProfile savedProfile = new();
     private string savedSrmManifestPath = string.Empty;
-    private string savedTeensyPort = string.Empty;
+    private string savedBoardPort = string.Empty;
     private BridgeInputMode savedInputMode;
     private BridgeOutputMode savedOutputMode;
     private AppTheme savedTheme;
@@ -57,6 +58,8 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private readonly AsyncRelayCommand saveGameCommand;
     private readonly AsyncRelayCommand launchGameCommand;
     private readonly AsyncRelayCommand saveGeneralCommand;
+    private readonly AsyncRelayCommand applySteamInputActionsCommand;
+    private readonly AsyncRelayCommand updateFirmwareCommand;
 
     public MainWindowViewModel(
         BridgeLaunchOptions launchOptions,
@@ -64,7 +67,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         BridgeRuntime runtime,
         Action<BridgeInputMode> applyInputMode,
         Action<BridgeOutputMode> applyOutputMode,
-        Action<string> applyTeensyPort,
+        Action<string> applyBoardPort,
         Action<AppTheme> applyTheme,
         Func<AppUpdateCheckResult, bool> confirmUpdate,
         Action<Action> dispatch)
@@ -73,9 +76,10 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         this.settingsStore = settingsStore;
         this.runtime = runtime;
         srmManifestWriter = new SrmManifestWriter(settingsStore);
+        boardFirmwareUpdater = new BoardFirmwareUpdater();
         this.applyInputMode = applyInputMode;
         this.applyOutputMode = applyOutputMode;
-        this.applyTeensyPort = applyTeensyPort;
+        this.applyBoardPort = applyBoardPort;
         this.applyTheme = applyTheme;
         this.confirmUpdate = confirmUpdate;
         this.dispatch = dispatch;
@@ -90,9 +94,14 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         saveGameCommand = new AsyncRelayCommand(SaveGameAsync, CanSaveProfile);
         launchGameCommand = new AsyncRelayCommand(LaunchGameAsync, CanSaveOrLaunchProfile);
         saveGeneralCommand = new AsyncRelayCommand(SaveGeneralAsync, HasGeneralChanges);
+        applySteamInputActionsCommand = new AsyncRelayCommand(ApplySteamInputActionsAsync, CanApplySteamInputActions);
         SaveGameCommand = saveGameCommand;
         LaunchGameCommand = launchGameCommand;
         SaveGeneralCommand = saveGeneralCommand;
+        ExportSrmManifestCommand = new AsyncRelayCommand(ExportSrmManifestAsync);
+        ApplySteamInputActionsCommand = applySteamInputActionsCommand;
+        updateFirmwareCommand = new AsyncRelayCommand(UpdateFirmwareAsync);
+        UpdateFirmwareCommand = updateFirmwareCommand;
         CheckForUpdateCommand = new AsyncRelayCommand(CheckForUpdateAsync);
         OpenAppDataCommand = new AsyncRelayCommand(OpenAppDataAsync);
         InstallDriverCommand = new AsyncRelayCommand(InstallDriverAsync, () => false);
@@ -116,12 +125,24 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
 
     public ObservableCollection<string> GameIds { get; } = [];
     public ObservableCollection<AppTheme> ThemeOptions { get; } = [AppTheme.System, AppTheme.Light, AppTheme.Dark];
-    public ObservableCollection<BridgeInputMode> InputModeOptions { get; } = [BridgeInputMode.LegacyMouse, BridgeInputMode.SteamInputActions];
-    public ObservableCollection<BridgeOutputMode> OutputModeOptions { get; } = [BridgeOutputMode.VisualizeOnly, BridgeOutputMode.Teensy, BridgeOutputMode.VirtualMouseDriver];
+    public ObservableCollection<SettingOption<BridgeInputMode>> InputModeOptions { get; } =
+    [
+        new(BridgeInputMode.LegacyMouse, "Virtual Mouse"),
+        new(BridgeInputMode.SteamInputActions, "Steam Input")
+    ];
+    public ObservableCollection<SettingOption<BridgeOutputMode>> OutputModeOptions { get; } =
+    [
+        new(BridgeOutputMode.VisualizeOnly, "None"),
+        new(BridgeOutputMode.Board, "Physical Mouse"),
+        new(BridgeOutputMode.VirtualMouseDriver, "Virtual Mouse")
+    ];
     public ICommand NewGameCommand { get; }
     public ICommand SaveGameCommand { get; }
     public ICommand LaunchGameCommand { get; }
     public ICommand SaveGeneralCommand { get; }
+    public ICommand ExportSrmManifestCommand { get; }
+    public ICommand ApplySteamInputActionsCommand { get; }
+    public ICommand UpdateFirmwareCommand { get; }
     public ICommand CheckForUpdateCommand { get; }
     public ICommand OpenAppDataCommand { get; }
     public ICommand InstallDriverCommand { get; }
@@ -239,12 +260,12 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         }
     }
 
-    public string TeensyPort
+    public string BoardPort
     {
-        get => teensyPort;
+        get => boardPort;
         set
         {
-            if (SetProperty(ref teensyPort, value))
+            if (SetProperty(ref boardPort, value))
             {
                 saveGeneralCommand.RaiseCanExecuteChanged();
             }
@@ -272,6 +293,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
             if (SetProperty(ref selectedInputMode, value))
             {
                 applyInputMode(value);
+                applySteamInputActionsCommand.RaiseCanExecuteChanged();
                 saveGeneralCommand.RaiseCanExecuteChanged();
             }
         }
@@ -318,7 +340,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     {
         get;
         private set => SetProperty(ref field, value);
-    } = "Teensy disconnected";
+    } = "Board disconnected";
 
     public string ActivityText
     {
@@ -338,6 +360,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     public bool ActivityIsError => isActivityError;
     public string VersionText => appUpdater.CurrentVersionText;
     public string DriverInstallText => driverInstallText;
+    public string BoardFirmwareText => boardFirmwareUpdater.StatusText;
     public string ActiveProfileText => string.IsNullOrWhiteSpace(activeProfileId) ? "No active profile" : $"Active profile: {activeProfileId}";
     public string TrayText => string.IsNullOrWhiteSpace(activeProfileId) ? "No profile" : $"Profile: {activeProfileId}";
     public string ProcessText => $"{ActiveProfileText} - PID {Environment.ProcessId}";
@@ -388,7 +411,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         return savedTheme != SelectedTheme
             || savedInputMode != SelectedInputMode
             || savedOutputMode != SelectedOutputMode
-            || !string.Equals(savedTeensyPort, TeensyPort.Trim(), StringComparison.Ordinal)
+            || !string.Equals(SerialPortSelection.Normalize(savedBoardPort), SerialPortSelection.Normalize(BoardPort), StringComparison.Ordinal)
             || !string.Equals(savedSrmManifestPath, SrmManifestPath.Trim(), StringComparison.Ordinal);
     }
 

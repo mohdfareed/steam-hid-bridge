@@ -18,7 +18,7 @@ public enum BridgeInputMode
 public enum BridgeOutputMode
 {
     VisualizeOnly,
-    Teensy,
+    Board,
     VirtualMouseDriver
 }
 
@@ -35,8 +35,8 @@ public sealed class GeneralSettings
 {
     public AppTheme Theme { get; set; } = AppTheme.System;
     public BridgeInputMode InputMode { get; set; } = BridgeInputMode.LegacyMouse;
-    public BridgeOutputMode OutputMode { get; set; } = BridgeOutputMode.Teensy;
-    public string TeensyPort { get; set; } = "auto";
+    public BridgeOutputMode OutputMode { get; set; } = BridgeOutputMode.Board;
+    public string BoardPort { get; set; } = "auto";
     public string SrmManifestPath { get; set; } = "";
 }
 

@@ -2,13 +2,14 @@ using System;
 using System.IO;
 using System.IO.Ports;
 using System.Threading;
+using SteamHidBridge.App.Configuration;
 using SteamHidBridge.App.Core.Input;
 using SteamHidBridge.App.Platform.App;
 using SteamHidBridge.Protocol;
 
 namespace SteamHidBridge.App.Core.Output;
 
-public sealed class TeensySerialMouseOutput(string configuredPort) : IMouseInputConsumer, IOutputStatusProvider, IDisposable
+public sealed class BoardSerialMouseOutput(string configuredPort) : IMouseInputConsumer, IOutputStatusProvider, IDisposable
 {
     private const int BaudRate = 115200;
     private static readonly TimeSpan ReconnectInterval = TimeSpan.FromSeconds(1);
@@ -18,8 +19,8 @@ public sealed class TeensySerialMouseOutput(string configuredPort) : IMouseInput
     private SerialPort? serialPort;
     private byte sequence;
     private long nextConnectAttempt;
-    private string configuredPort = NormalizePort(configuredPort);
-    private string statusText = "Teensy disconnected";
+    private string configuredPort = SerialPortSelection.ToWindowsPortName(configuredPort);
+    private string statusText = "Board disconnected";
     private bool isDisposed;
 
     public string StatusText
@@ -37,10 +38,10 @@ public sealed class TeensySerialMouseOutput(string configuredPort) : IMouseInput
     {
         lock (syncLock)
         {
-            configuredPort = NormalizePort(value);
+            configuredPort = SerialPortSelection.ToWindowsPortName(value);
             ClosePort();
             nextConnectAttempt = 0;
-            statusText = "Teensy disconnected";
+            statusText = "Board disconnected";
         }
     }
 
@@ -82,19 +83,19 @@ public sealed class TeensySerialMouseOutput(string configuredPort) : IMouseInput
             BridgeFrame bridgeFrame = new(BridgeCommand.HidInput, sequence++, payload);
             if (!bridgeFrame.TryWrite(frameBuffer, out int bytesWritten))
             {
-                statusText = "Teensy frame encode failed";
+                statusText = "Board frame encode failed";
                 return;
             }
 
             try
             {
                 port.Write(frameBuffer, 0, bytesWritten);
-                statusText = $"Teensy connected: {port.PortName}";
+                statusText = $"Board connected: {port.PortName}";
             }
             catch (Exception ex) when (ex is IOException or InvalidOperationException or TimeoutException or UnauthorizedAccessException)
             {
-                AppLog.WriteException("teensy-write-failed", ex);
-                statusText = $"Teensy write failed: {port.PortName}";
+                AppLog.WriteException("board-write-failed", ex);
+                statusText = $"Board write failed: {port.PortName}";
                 ClosePort();
             }
         }
@@ -137,26 +138,26 @@ public sealed class TeensySerialMouseOutput(string configuredPort) : IMouseInput
             {
                 port.Open();
                 serialPort = port;
-                statusText = $"Teensy connected: {portName}";
-                AppLog.Write($"teensy connected port={portName}");
+                statusText = $"Board connected: {portName}";
+                AppLog.Write($"board connected port={portName}");
                 return serialPort;
             }
             catch (Exception ex) when (ex is IOException or InvalidOperationException or TimeoutException or UnauthorizedAccessException)
             {
-                AppLog.Write($"teensy connect failed port={portName} error={ex.Message}");
+                AppLog.Write($"board connect failed port={portName} error={ex.Message}");
                 port.Dispose();
             }
         }
 
-        statusText = configuredPort.Equals("auto", StringComparison.OrdinalIgnoreCase)
-            ? "Teensy disconnected: no serial port opened"
-            : $"Teensy disconnected: {configuredPort}";
+        statusText = configuredPort.Equals(SerialPortSelection.Auto, StringComparison.OrdinalIgnoreCase)
+            ? "Board disconnected: no serial port opened"
+            : $"Board disconnected: {configuredPort}";
         return null;
     }
 
     private string[] CandidatePorts()
     {
-        if (!configuredPort.Equals("auto", StringComparison.OrdinalIgnoreCase))
+        if (!configuredPort.Equals(SerialPortSelection.Auto, StringComparison.OrdinalIgnoreCase))
         {
             return [configuredPort];
         }
@@ -183,8 +184,4 @@ public sealed class TeensySerialMouseOutput(string configuredPort) : IMouseInput
         }
     }
 
-    private static string NormalizePort(string value)
-    {
-        return string.IsNullOrWhiteSpace(value) ? "auto" : value.Trim();
-    }
 }

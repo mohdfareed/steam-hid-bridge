@@ -1,0 +1,43 @@
+"Action Manifest"
+{
+    "actions"
+    {
+        "BridgeMouse"
+        {
+            "title" "#Set_BridgeMouse"
+            "StickPadGyro"
+            {
+                "Pointer"
+                {
+                    "title" "#Action_Pointer"
+                    "input_mode" "absolute_mouse"
+                }
+            }
+            "Button"
+            {
+                "LeftClick" "#Action_LeftClick"
+                "RightClick" "#Action_RightClick"
+                "MiddleClick" "#Action_MiddleClick"
+                "BackClick" "#Action_BackClick"
+                "ForwardClick" "#Action_ForwardClick"
+                "WheelUp" "#Action_WheelUp"
+                "WheelDown" "#Action_WheelDown"
+            }
+        }
+    }
+    "localization"
+    {
+        "english"
+        {
+            "Set_BridgeMouse" "Mouse"
+            "Action_Pointer" "Pointer"
+            "Action_LeftClick" "Left Click"
+            "Action_RightClick" "Right Click"
+            "Action_MiddleClick" "Middle Click"
+            "Action_BackClick" "Back Button"
+            "Action_ForwardClick" "Forward Button"
+            "Action_WheelUp" "Wheel Up"
+            "Action_WheelDown" "Wheel Down"
+        }
+    }
+}

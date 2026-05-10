@@ -161,4 +161,4 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 Write-Host "Driver install completed."
-Write-Host "Run SteamHidBridge.VirtualMouse.TestSender to verify mouse reports."
+Write-Host "Use the app's Virtual Mouse output mode to verify mouse reports."
