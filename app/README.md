@@ -1,6 +1,6 @@
 # Windows App
 
-The Windows app is the Steam-launched bridge host. It keeps Steam focused on the bridge shortcut, stores per-game launch metadata, reads mouse actions from Steam Input, and previews normalized output while the Teensy transport is still pending.
+The Windows app is the Steam-launched bridge host. It keeps Steam focused on the bridge shortcut, stores per-game launch metadata, observes Steam's legacy mouse output through Windows Raw Input, and previews normalized output while the Teensy transport is still pending.
 
 ## Current Behavior
 
@@ -21,10 +21,10 @@ The Windows app is the Steam-launched bridge host. It keeps Steam focused on the
 SteamHidBridge.App/
   Views/            WPF presentation
   ViewModels/       WPF binding state and commands
-  Runtime/          process lifetime, foreground gate, Steam forcing, input loop
+  Runtime/          process lifetime, foreground gate, Steam forcing, input routing
   Profiles/         appsettings schema and Steam ROM Manager export
   Input/            mouse frame model and output consumers
-  Steam/            Steam Input emitter and config forcing
+  Steam/            Steam config forcing notes and helper
   Windows/          Win32 foreground/process helpers
   Startup/          command-line parsing
   Updates/          GitHub Release check and update handoff
@@ -59,6 +59,6 @@ The General section writes a Steam ROM Manager manifest JSON file for all profil
 
 When a configured receiver owns the foreground window, the app requests Steam config forcing with `steam://forceinputappid/<appid>`. It resets with `steam://forceinputappid/0` when foreground is lost or the bridge exits. Steam normally provides the app id in the launch environment.
 
-The transparent overlay host window exists only in `--launch` mode so Steam has a bridge-owned window while the target game is foreground. Do not put Steam layout editing, VDF rewriting, or automatic layout import/export in v1.
+Launch mode keeps the main window hidden behind the tray icon. Do not put Steam layout editing, VDF rewriting, automatic layout import/export, or overlay-host workarounds in v1.
 
-Steam Input currently reads only mouse actions. See [Steam/README.md](Steam/README.md) for the action manifest and action names.
+Input currently observes legacy mouse output through Windows Raw Input. See [Steam/README.md](Steam/README.md) for the active Steam integration notes.

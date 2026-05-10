@@ -2,7 +2,7 @@
 
 Steam HID Bridge is a small Steam-launched Windows app plus a future Teensy HID firmware path. Steam Input remains the controller configuration layer; this project handles profile launch state, foreground gating, and eventually keyboard/mouse HID emission.
 
-Current MVP status: the Windows tray app works for profile launch, target process lifetime, settings editing, output preview, and Steam ROM Manager export. Real Steam Input reading and Teensy output are the next implementation steps.
+Current MVP status: the Windows tray app works for profile launch, target process lifetime, settings editing, Steam ROM Manager export, and Windows Raw Input preview of Steam legacy mouse output. Teensy output is the next implementation step.
 
 ## Layout
 
@@ -10,6 +10,7 @@ Current MVP status: the Windows tray app works for profile launch, target proces
 app/        Windows bridge application
 protocol/   Host-device frame and HID report payloads
 firmware/   Teensy 4.0 placeholder firmware
+driver/     Reserved VHF/KMDF virtual HID software-output path
 tests/      Protocol tests
 scripts/    Build, test, publish, release helpers
 ```

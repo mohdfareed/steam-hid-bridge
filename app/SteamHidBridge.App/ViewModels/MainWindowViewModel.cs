@@ -247,13 +247,13 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     {
         get;
         private set => SetProperty(ref field, value);
-    } = "input loop starting";
+    } = "waiting for mouse input";
 
-    public string SteamInputText
+    public string InputSourceText
     {
         get;
         private set => SetProperty(ref field, value);
-    } = "Steam Input not initialized.";
+    } = "Legacy mouse observer active.";
 
     public string ActivityText
     {

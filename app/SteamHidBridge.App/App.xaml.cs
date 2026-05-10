@@ -10,6 +10,7 @@ using SteamHidBridge.App.Startup;
 using SteamHidBridge.App.Updates;
 using SteamHidBridge.App.ViewModels;
 using SteamHidBridge.App.Views;
+using SteamHidBridge.App.Windows;
 
 [assembly: ThemeInfo(ResourceDictionaryLocation.None, ResourceDictionaryLocation.SourceAssembly)]
 
@@ -20,8 +21,8 @@ public partial class App : Application
     private TrayIconHost? trayIconHost;
     private MainWindowViewModel? mainWindowViewModel;
     private BridgeRuntime? bridgeRuntime;
-    private SteamOverlayHostWindow? overlayHostWindow;
     private ShutdownSignalListener? shutdownSignalListener;
+    private RawMouseInputWindowHook? rawMouseInputWindowHook;
     private bool hideMainWindowToTrayOnClose;
     private bool isExiting;
 
@@ -68,11 +69,12 @@ public partial class App : Application
             MainWindow = window;
 
             trayIconHost = new TrayIconHost(window, mainWindowViewModel.TrayText, () => ExitApplication(0));
+            rawMouseInputWindowHook = new RawMouseInputWindowHook(window, bridgeRuntime.PublishMouseInput);
             if (launchOptions.LaunchGame)
             {
-                overlayHostWindow = new SteamOverlayHostWindow();
-                overlayHostWindow.Show();
-                AppLog.Write("main-window hidden and overlay-host shown for launch mode");
+                window.Show();
+                window.Hide();
+                AppLog.Write("main-window hidden for launch mode");
             }
             else
             {
@@ -92,9 +94,9 @@ public partial class App : Application
     {
         isExiting = true;
         bridgeRuntime?.Dispose();
-        overlayHostWindow?.Close();
         trayIconHost?.Dispose();
         shutdownSignalListener?.Dispose();
+        rawMouseInputWindowHook?.Dispose();
         AppLog.Write($"exit code={e.ApplicationExitCode}");
         base.OnExit(e);
     }

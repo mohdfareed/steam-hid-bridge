@@ -24,6 +24,8 @@ Do not build around Steam Desktop Configuration. Do not require manual Steam Des
 
 The v1 output scope is keyboard and mouse HID. Native controller or DualSense-style gyro emulation is outside scope unless explicitly added later after evaluating firmware complexity, device identity, and anti-cheat risk.
 
+Software virtual HID output may be investigated while Teensy hardware is delayed, but it must live behind a separate driver boundary. Do not use `SendInput` as a serious output backend. A reWASD-class software option means a signed virtual HID driver, preferably KMDF/VHF, with explicit install/uninstall and risk documentation.
+
 ## Constraints
 
 The implementation must be simple, observable, and low-latency.
@@ -69,7 +71,7 @@ Keep diagnostics separate from the hot path.
 
 Keep business logic decoupled from WPF views. UI should bind to view models and services; protocol, transport, validation, startup behavior, and HID mapping logic must remain testable without constructing WPF controls. The WPF UI should be replaceable later without rewriting app logic.
 
-The Windows app runtime belongs outside WPF views and view models. `Runtime/` owns process lifetime, foreground gating, Steam config forcing, and Steam Input loop orchestration. View models should only expose editable state and commands for WPF binding.
+The Windows app runtime belongs outside WPF views and view models. `Runtime/` owns process lifetime, foreground gating, Steam config forcing, and input routing. View models should only expose editable state and commands for WPF binding.
 
 Do not add abstractions, settings, modes, services, or configuration switches unless they are required by the MVP or the user explicitly asks for them. When a use case is unclear, ask before implementing.
 
@@ -90,11 +92,11 @@ Use current official documentation for platform APIs, libraries, and tooling.
 - `.slnx` solution format.
 - Current stable .NET project files with latest C# language selection and explicit usings.
 - WPF shell with editable game settings, profile startup, optional target launch, foreground receiver gate, Steam config forcing, and output preview.
-- Launch mode (`--launch`) starts the configured target, keeps the bridge UI hidden behind a tray icon, and shows only a transparent Steam overlay host window. The current tray behavior is per bridge process; do not add a shared tray host or cross-process instance list without an explicit IPC decision.
+- Launch mode (`--launch`) starts the configured target and keeps the bridge UI hidden behind a tray icon. Do not add overlay-host workarounds back without a new validated reason. The current tray behavior is per bridge process; do not add a shared tray host or cross-process instance list without an explicit IPC decision.
 - If the bridge starts a target process, it owns that process lifetime. Steam stopping the bridge should close the launched process tree, and the bridge should exit when the launched receiver exits.
 - In normal interactive mode, closing the status window exits the app. In `--launch` mode, closing the status window hides it back to the tray. Launch-mode instances exit through the tray Exit command, launched receiver exit, or Steam/process termination.
 - Multiple instances may save `appsettings.json`; writes must use the settings-store mutex and atomic write path so profile saves merge with the latest file contents.
-- Output is always previewed in the app model. When real Steam Input and Teensy transport are added, forwarding must only run while a configured receiver process is the foreground process. Do not add manual output-destination modes for v1.
+- Output is always previewed in the app model. Future Teensy transport must only run while a configured receiver process is the foreground process. Do not add manual output-destination modes for v1.
 - Steam ROM Manager export should generate bridge-targeted shortcuts, not game-targeted shortcuts. Each generated entry should launch the bridge with `--profile <id> --launch`; the selected profile then launches the configured game executable.
 - General app settings live under the `general` JSON object. It contains `theme` (`system`, `light`, or `dark`) and `srmManifestPath`, which defaults under `%LOCALAPPDATA%\SteamHidBridge\srm\games.json`. Theme selection must use WPF's built-in Fluent `ThemeMode` API, not custom control templates. Do not mutate SRM's own parser configuration unless explicitly requested.
 - Do not inject a synthetic `default` profile. If no profile is requested, select an existing profile; create a local `new-game` entry only when there are no profiles loaded.
@@ -105,10 +107,8 @@ Use current official documentation for platform APIs, libraries, and tooling.
 - Runtime settings and logs belong under `%LOCALAPPDATA%\SteamHidBridge\`. Keep app lifecycle/error logging in `logs/app.log` and updater wrapper output in `logs/update.log`; do not add new ad hoc log files without a documented need.
 - Startup may refresh app-owned derived files: normalize/write `appsettings.json` through the settings store and regenerate the configured SRM manifest. Startup must not mutate Steam caches, SRM parser config, controller layouts, or Steam shortcut databases.
 - Steam Input config forcing uses Steam's official `steam://forceinputappid/<appid>` URL only while the configured receiver is foreground, and resets with `steam://forceinputappid/0` when foreground is lost or the bridge exits.
-- Steam Input integration belongs under `app/SteamHidBridge.App/Steam/`. Keep the real Steamworks API reader isolated there; do not let WPF focus state drive input capture.
-- Load the native Steam Input action manifest with `SetInputActionManifestFilePath`. Do not ship `steam_appid.txt`, write `game_actions_<appid>.vdf`, or scan Steam shortcut databases unless the user explicitly reopens that approach with a documented reason.
-- Treat the 2026 Steam Controller as part of the Steam Controller family until Valve documents a new action-manifest controller type string. Keep manifest/config docs explicit about exported controller layouts being required before adding real configuration paths.
-- Steam Input is the only input emitter. Mouse frames flow through `BridgeRuntime` to the GUI preview every frame and to physical mouse output consumers only after foreground receiver gating passes. Poll input on a dedicated background loop, independently from slower UI/status refresh work.
+- Active MVP input uses Steam legacy mouse output observed through Windows Raw Input. Do not ship `steam_appid.txt`, write `game_actions_<appid>.vdf`, scan Steam shortcut databases, or add Steamworks.NET/native Steam Input API dependencies unless the user explicitly reopens native Steam Input with a documented reason.
+- Windows Raw Input is the active input emitter for Steam legacy mouse output. Mouse frames flow through `BridgeRuntime` to the GUI preview at a throttled display rate and to output consumers per input event after foreground receiver gating passes.
 - Shared C# protocol library for frame encoding, validation, and the HID input payload.
 - MSTest protocol tests for synthetic input and malformed-frame handling.
 - PlatformIO firmware placeholder for Teensy 4.0.
@@ -126,17 +126,17 @@ Validate Steam shortcut/runtime behavior before building more UI:
 5. Confirm multiple Steam shortcuts can point to the same executable while retaining distinct Steam Input configurations.
 6. Confirm launch arguments identify the intended profile.
 7. Confirm only one bridge instance owns the Teensy device at a time.
-8. Confirm the app can initialize Steamworks/Steam Input from this shortcut mode.
-9. Confirm the app can read Steam Input analog actions, including `absolute_mouse` mouse-like delta data.
-10. Confirm Steam Controller, DualSense, or other gyro-capable controllers can be configured through Steam Input for that action and produce usable delta data.
-11. Forward those deltas to the Teensy and verify HID mouse output.
+8. Confirm Steam legacy mouse output is observable through Windows Raw Input while the bridge shortcut config is forced.
+9. Confirm Steam Controller, DualSense, or other gyro-capable controllers can be configured through Steam legacy mouse bindings and produce usable mouse deltas.
+10. Forward those deltas to the Teensy and verify HID mouse output.
 
-Do not implement Steam config editing, Steam VDF rewriting, or automatic Steam layout import/export in v1. Those are future research items.
+Do not implement native Steam Input action manifests, Steam config editing, Steam VDF rewriting, or automatic Steam layout import/export in v1. Those are future research items.
 
 ## Repository Layout
 
 ```text
 firmware/
+driver/
 app/
 app/SteamHidBridge.App/Runtime/
 protocol/

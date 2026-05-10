@@ -4,4 +4,4 @@ public sealed record BridgeRuntimeStatus(
     bool ForwardingEnabled,
     string ForwardingText,
     string InputLoopText,
-    string SteamInputText);
+    string InputSourceText);

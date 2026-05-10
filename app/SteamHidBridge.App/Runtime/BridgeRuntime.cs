@@ -7,7 +7,6 @@ using SteamHidBridge.App.Infrastructure;
 using SteamHidBridge.App.Input;
 using SteamHidBridge.App.Profiles;
 using SteamHidBridge.App.Startup;
-using SteamHidBridge.App.Steam;
 using SteamHidBridge.App.Windows;
 
 namespace SteamHidBridge.App.Runtime;
@@ -16,8 +15,7 @@ public sealed class BridgeRuntime : IDisposable
 {
     private static readonly TimeSpan StatusInterval = TimeSpan.FromMilliseconds(250);
     private readonly BridgeLaunchOptions launchOptions;
-    private readonly SteamMouseInputEmitter steamMouseInputEmitter = new();
-    private readonly MouseInputLoop mouseInputLoop;
+    private readonly MouseInputRouter mouseInputRouter;
     private readonly GameProcessHost gameProcessHost;
     private readonly ForwardingGate forwardingGate;
     private readonly CancellationTokenSource cancellation = new();
@@ -33,7 +31,7 @@ public sealed class BridgeRuntime : IDisposable
         this.launchOptions = launchOptions;
         gameProcessHost = new GameProcessHost(SetActivity);
         forwardingGate = new ForwardingGate(SetActivity);
-        mouseInputLoop = new MouseInputLoop(steamMouseInputEmitter, OnMouseInput, forwardingConsumers, () => forwardingGate.IsForwarding);
+        mouseInputRouter = new MouseInputRouter(OnMouseInput, forwardingConsumers, () => forwardingGate.IsForwarding);
         statusTask = Task.Run(RunStatusLoopAsync);
     }
 
@@ -41,6 +39,11 @@ public sealed class BridgeRuntime : IDisposable
     public event Action<BridgeRuntimeStatus>? StatusChanged;
     public event Action<string, bool>? ActivityChanged;
     public event Action<int>? ExitRequested;
+
+    public void PublishMouseInput(MouseInputFrame frame)
+    {
+        mouseInputRouter.Publish(frame);
+    }
 
     public void SetProfile(string id, GameProfile value)
     {
@@ -91,7 +94,6 @@ public sealed class BridgeRuntime : IDisposable
         gameProcessHost.Dispose();
         StopReceiverProcesses();
         forwardingGate.Dispose();
-        mouseInputLoop.Dispose();
         cancellation.Dispose();
     }
 
@@ -141,16 +143,16 @@ public sealed class BridgeRuntime : IDisposable
 
     private void PublishStatus(string forwardingText)
     {
-        MouseInputLoopStatistics statistics = mouseInputLoop.GetStatistics();
-        string inputLoopText = statistics.PollCount == 0
-            ? "input loop starting"
-            : $"poll {statistics.PollsPerSecond:F0}/s, frames {statistics.FramesPerSecond:F0}/s";
+        MouseInputStatistics statistics = mouseInputRouter.GetStatistics();
+        string inputLoopText = statistics.EventCount == 0
+            ? "waiting for mouse input"
+            : $"events {statistics.EventsPerSecond:F0}/s, preview {statistics.PreviewFramesPerSecond:F0}/s";
 
         StatusChanged?.Invoke(new BridgeRuntimeStatus(
             forwardingGate.IsForwarding,
             forwardingText,
             inputLoopText,
-            steamMouseInputEmitter.StatusText));
+            "Legacy mouse observer active."));
     }
 
     private void SetActivity(string value, bool isError = false)
