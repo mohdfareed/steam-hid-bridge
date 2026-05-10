@@ -17,7 +17,9 @@ public sealed class BoardFirmwareUpdater
         get
         {
             string hexPath = Path.Combine(firmwareDirectory, FirmwareFileName + ".hex");
-            return File.Exists(hexPath) ? "Bundled firmware available" : "Bundled firmware missing";
+            return File.Exists(hexPath)
+                ? "Flash the packaged firmware to update the board."
+                : "Firmware package is missing.";
         }
     }
 

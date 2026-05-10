@@ -45,15 +45,15 @@ public partial class App : Application
             hideMainWindowToTrayOnClose = launchOptions.LaunchGame;
             AppLog.Write($"launch-options profile={launchOptions.ProfileId} launchGame={launchOptions.LaunchGame}");
 
-            AppSettingsStore settingsStore = AppSettingsStore.LoadDefault();
+            AppSettingsLoadResult settingsLoad = AppSettingsStore.LoadDefault();
+            AppSettingsStore settingsStore = settingsLoad.Store;
             AppLog.Write($"settings loaded path={settingsStore.FilePath}");
-            StartupSync.Run(settingsStore);
             AppThemeManager.Apply(settingsStore.Document.General.Theme);
+            SteamNativeLibraryPath.Configure();
 
-            mouseOutputRouter = new MouseOutputRouter(settingsStore.Document.General.OutputMode, settingsStore.Document.General.BoardPort);
+            mouseOutputRouter = new MouseOutputRouter(BridgeOutputMode.Board, settingsStore.Document.General.BoardPort);
             bridgeRuntime = new BridgeRuntime(launchOptions, [mouseOutputRouter]);
             steamInputMouseEmitter = new SteamInputMouseEmitter(bridgeRuntime.PublishSteamInputMouseInput, bridgeRuntime.SetInputStatus);
-            ApplyInputMode(settingsStore.Document.General.InputMode);
             mainWindowViewModel = new MainWindowViewModel(
                 launchOptions,
                 settingsStore,
@@ -79,6 +79,11 @@ public partial class App : Application
 
             trayIconHost = new TrayIconHost(window, mainWindowViewModel.TrayText, () => ExitApplication(0));
             rawMouseInputWindowHook = new RawMouseInputWindowHook(window, bridgeRuntime.PublishLegacyMouseInput);
+            if (!string.IsNullOrWhiteSpace(settingsLoad.WarningMessage))
+            {
+                ShowSettingsRecoveryWarning(settingsLoad.WarningMessage);
+            }
+
             if (launchOptions.LaunchGame)
             {
                 window.Show();
@@ -187,6 +192,16 @@ public partial class App : Application
             "Steam HID Bridge",
             MessageBoxButton.OK,
             MessageBoxImage.Error);
+    }
+
+    private static void ShowSettingsRecoveryWarning(string message)
+    {
+        AppLog.Write(message);
+        _ = MessageBox.Show(
+            message,
+            "Steam HID Bridge Settings Reset",
+            MessageBoxButton.OK,
+            MessageBoxImage.Warning);
     }
 
     private static bool ConfirmUpdate(AppUpdateCheckResult update)

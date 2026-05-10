@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Security.Cryptography;
 using System.Text;
@@ -23,17 +24,27 @@ public sealed class AppSettingsStore(string path, AppSettings document)
     public string FilePath { get; } = path;
     public AppSettings Document { get; } = document;
 
-    public static AppSettingsStore LoadDefault()
+    public static AppSettingsLoadResult LoadDefault()
     {
         string path = AppDataPaths.SettingsPath;
         if (!File.Exists(path))
         {
-            return new AppSettingsStore(path, Normalize(new AppSettings()));
+            return new AppSettingsLoadResult(new AppSettingsStore(path, Normalize(new AppSettings())), null);
         }
 
-        string json = File.ReadAllText(path);
-        AppSettings? document = JsonSerializer.Deserialize<AppSettings>(json, JsonOptions);
-        return new AppSettingsStore(path, Normalize(document));
+        try
+        {
+            string json = File.ReadAllText(path);
+            AppSettings? document = JsonSerializer.Deserialize<AppSettings>(json, JsonOptions);
+            return new AppSettingsLoadResult(new AppSettingsStore(path, Normalize(document)), null);
+        }
+        catch (Exception ex) when (ex is JsonException or NotSupportedException)
+        {
+            string backupPath = BackupInvalidSettings(path);
+            return new AppSettingsLoadResult(
+                new AppSettingsStore(path, Normalize(new AppSettings())),
+                $"The settings file was invalid and has been backed up.\n\nBackup:\n{backupPath}\n\nSteam HID Bridge started with empty settings.");
+        }
     }
 
     public void SaveGame(string oldId, string newId, GameProfile profile)
@@ -49,22 +60,13 @@ public sealed class AppSettingsStore(string path, AppSettings document)
         });
     }
 
-    public void SaveGeneral(AppTheme theme, BridgeInputMode inputMode, BridgeOutputMode outputMode, string boardPort, string srmManifestPath)
+    public void SaveGeneral(AppTheme theme, string boardPort, string srmManifestPath)
     {
         Save(latest =>
         {
             latest.General.Theme = theme;
-            latest.General.InputMode = inputMode;
-            latest.General.OutputMode = outputMode;
             latest.General.BoardPort = SerialPortSelection.Normalize(boardPort);
             latest.General.SrmManifestPath = srmManifestPath.Trim();
-        });
-    }
-
-    public void SaveCurrent()
-    {
-        Save(static _ =>
-        {
         });
     }
 
@@ -88,8 +90,6 @@ public sealed class AppSettingsStore(string path, AppSettings document)
             WriteAtomic(FilePath, latest);
 
             Document.General.Theme = latest.General.Theme;
-            Document.General.InputMode = latest.General.InputMode;
-            Document.General.OutputMode = latest.General.OutputMode;
             Document.General.BoardPort = latest.General.BoardPort;
             Document.General.SrmManifestPath = latest.General.SrmManifestPath;
             Document.Games.Clear();
@@ -122,16 +122,6 @@ public sealed class AppSettingsStore(string path, AppSettings document)
     {
         document ??= new AppSettings();
         document.General ??= new GeneralSettings();
-        if (!Enum.IsDefined(document.General.InputMode))
-        {
-            document.General.InputMode = BridgeInputMode.LegacyMouse;
-        }
-
-        if (!Enum.IsDefined(document.General.OutputMode))
-        {
-            document.General.OutputMode = BridgeOutputMode.Board;
-        }
-
         document.General.BoardPort = SerialPortSelection.Normalize(document.General.BoardPort);
         if (string.IsNullOrWhiteSpace(document.General.SrmManifestPath))
         {
@@ -139,6 +129,25 @@ public sealed class AppSettingsStore(string path, AppSettings document)
         }
 
         document.Games ??= [];
+        foreach (GameProfile game in document.Games.Values)
+        {
+            if (!Enum.IsDefined(game.InputMode))
+            {
+                game.InputMode = BridgeInputMode.LegacyMouse;
+            }
+
+            if (!Enum.IsDefined(game.OutputMode))
+            {
+                game.OutputMode = BridgeOutputMode.Board;
+            }
+            else if (game.OutputMode == BridgeOutputMode.VirtualMouse)
+            {
+                // TODO: Remove when driver is fully developed
+                game.OutputMode = BridgeOutputMode.Board;
+            }
+
+            game.ReceiverProcesses ??= [];
+        }
         return document;
     }
 
@@ -162,4 +171,29 @@ public sealed class AppSettingsStore(string path, AppSettings document)
         byte[] hash = SHA256.HashData(Encoding.UTF8.GetBytes(fullPath));
         return "Local\\SteamHidBridge.AppSettings." + Convert.ToHexString(hash);
     }
+
+    private static string BackupInvalidSettings(string path)
+    {
+        string directory = Path.GetDirectoryName(path) ?? AppDataPaths.RootDirectory;
+        string fileNameWithoutExtension = Path.GetFileNameWithoutExtension(path);
+        string extension = Path.GetExtension(path);
+        string backupPath = Path.Combine(
+            directory,
+            $"{fileNameWithoutExtension}.invalid-{DateTime.Now:yyyyMMdd-HHmmss}{extension}");
+
+        int suffix = 2;
+        while (File.Exists(backupPath))
+        {
+            backupPath = Path.Combine(
+                directory,
+                $"{fileNameWithoutExtension}.invalid-{DateTime.Now:yyyyMMdd-HHmmss}-{suffix}{extension}");
+            suffix++;
+        }
+
+        File.Move(path, backupPath);
+        return backupPath;
+    }
+
 }
+
+public sealed record AppSettingsLoadResult(AppSettingsStore Store, string? WarningMessage);

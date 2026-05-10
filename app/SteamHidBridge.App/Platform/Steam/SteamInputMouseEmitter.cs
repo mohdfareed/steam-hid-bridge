@@ -130,7 +130,7 @@ public sealed class SteamInputMouseEmitter(Action<MouseInputFrame> publishFrame,
         nextInitAttempt = now + 2000;
         try
         {
-            SteamInputActionManifestResult manifest = SteamInputActionManifest.Write();
+            string manifestPath = SteamInputActionManifest.Write();
             string error = "";
             ESteamAPIInitResult initResult = SteamAPI.InitEx(out error);
             if (initResult != ESteamAPIInitResult.k_ESteamAPIInitResult_OK)
@@ -139,9 +139,9 @@ public sealed class SteamInputMouseEmitter(Action<MouseInputFrame> publishFrame,
                 return false;
             }
 
-            if (!SteamInput.SetInputActionManifestFilePath(manifest.ManifestPath))
+            if (!SteamInput.SetInputActionManifestFilePath(manifestPath))
             {
-                SetStatus($"Steam Input unavailable: could not load action manifest {manifest.ManifestPath}", isError: true);
+                SetStatus($"Steam Input unavailable: could not load action manifest {manifestPath}", isError: true);
                 return false;
             }
 

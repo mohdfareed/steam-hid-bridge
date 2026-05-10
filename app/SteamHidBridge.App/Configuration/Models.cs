@@ -17,9 +17,9 @@ public enum BridgeInputMode
 
 public enum BridgeOutputMode
 {
-    VisualizeOnly,
+    None,
     Board,
-    VirtualMouseDriver
+    VirtualMouse
 }
 
 public sealed class GameProfile
@@ -28,14 +28,14 @@ public sealed class GameProfile
     public string Executable { get; set; } = string.Empty;
     public string Arguments { get; set; } = string.Empty;
     public string WorkingDirectory { get; set; } = string.Empty;
+    public BridgeInputMode InputMode { get; set; } = BridgeInputMode.LegacyMouse;
+    public BridgeOutputMode OutputMode { get; set; } = BridgeOutputMode.Board;
     public List<string> ReceiverProcesses { get; set; } = [];
 }
 
 public sealed class GeneralSettings
 {
     public AppTheme Theme { get; set; } = AppTheme.System;
-    public BridgeInputMode InputMode { get; set; } = BridgeInputMode.LegacyMouse;
-    public BridgeOutputMode OutputMode { get; set; } = BridgeOutputMode.Board;
     public string BoardPort { get; set; } = "auto";
     public string SrmManifestPath { get; set; } = "";
 }

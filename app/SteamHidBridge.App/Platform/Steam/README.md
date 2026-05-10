@@ -24,14 +24,14 @@ Steam shortcut/profile
 
 `Virtual Mouse` mode observes mouse movement, buttons, and wheel from Windows Raw Input. Steam can produce that input through normal controller templates and legacy mouse bindings.
 
-`Steam Input` mode loads a minimal action manifest and polls Steamworks `ISteamInput` actions. The manifest defines:
+`Steam Input` mode loads a minimal bundled action manifest and polls Steamworks `ISteamInput` actions. The manifest defines:
 
 - `Pointer` as a `StickPadGyro` action using `absolute_mouse`.
 - `LeftClick`, `RightClick`, `MiddleClick`, `BackClick`, `ForwardClick`, `WheelUp`, and `WheelDown` as digital button actions.
 
-The Settings tab has an explicit `Apply` button for the Steam Input action manifest. Saving general settings also writes the action manifest when Input is set to `Steam Input`.
+There is no separate Steam Input export/apply step in the app anymore. Saving a profile writes the SRM manifest only; Steam Input uses the bundled manifest when the shortcut launches the bridge.
 
-The app still uses `steam://forceinputappid/<appid>` while a configured receiver owns the foreground window. That keeps Steam's shortcut controller config active for launcher-based games. The app id is read from Steam's launch environment.
+The app still uses `steam://forceinputappid/<appid>` while a configured receiver owns the foreground window. That keeps Steam's shortcut controller config active for launcher-based games. The app id is only used for this force-input path.
 
 ## Files
 
@@ -45,6 +45,7 @@ Published builds copy it under:
 
 ```text
 Steam\action_manifest.vdf
+Steam\steam_api64.dll
 ```
 
 At runtime, the app copies it under:
@@ -53,10 +54,4 @@ At runtime, the app copies it under:
 %LOCALAPPDATA%\SteamHidBridge\steam-input\action_manifest.vdf
 ```
 
-When Steam provides an app id, the app also writes:
-
-```text
-<Steam>\controller_config\game_actions_<appid>.vdf
-```
-
-Published builds include `steam_api64.dll` beside `SteamHidBridge.exe`.
+The app registers the published `Steam\` folder as a native DLL search path before Steamworks initialization.

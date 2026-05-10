@@ -21,9 +21,9 @@ public sealed class MouseOutputRouter(BridgeOutputMode outputMode, string boardP
             {
                 return outputMode switch
                 {
-                    BridgeOutputMode.VisualizeOnly => "Visualize only",
+                    BridgeOutputMode.None => "Visualize only",
                     BridgeOutputMode.Board => boardOutput.StatusText,
-                    BridgeOutputMode.VirtualMouseDriver => driverOutput.StatusText,
+                    BridgeOutputMode.VirtualMouse => driverOutput.StatusText,
                     _ => "Unknown output mode"
                 };
             }
@@ -57,7 +57,7 @@ public sealed class MouseOutputRouter(BridgeOutputMode outputMode, string boardP
                 case BridgeOutputMode.Board:
                     boardOutput.Refresh();
                     break;
-                case BridgeOutputMode.VirtualMouseDriver:
+                case BridgeOutputMode.VirtualMouse:
                     driverOutput.Refresh();
                     break;
             }
@@ -78,7 +78,7 @@ public sealed class MouseOutputRouter(BridgeOutputMode outputMode, string boardP
                 case BridgeOutputMode.Board:
                     boardOutput.Consume(frame);
                     break;
-                case BridgeOutputMode.VirtualMouseDriver:
+                case BridgeOutputMode.VirtualMouse:
                     driverOutput.Consume(frame);
                     break;
             }

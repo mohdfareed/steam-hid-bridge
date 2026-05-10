@@ -39,7 +39,7 @@
       <SteamworksNativeDll>$(PkgSteamworks_NET_AnyCPU)\runtimes\win-x64\native\steam_api64.dll</SteamworksNativeDll>
     </PropertyGroup>
     <Copy SourceFiles="$(SteamworksNativeDll)"
-          DestinationFolder="$(TargetDir)"
+          DestinationFolder="$(TargetDir)Steam\"
           Condition="Exists('$(SteamworksNativeDll)')" />
   </Target>
 
@@ -48,7 +48,7 @@
       <SteamworksNativeDll>$(PkgSteamworks_NET_AnyCPU)\runtimes\win-x64\native\steam_api64.dll</SteamworksNativeDll>
     </PropertyGroup>
     <Copy SourceFiles="$(SteamworksNativeDll)"
-          DestinationFolder="$(PublishDir)"
+          DestinationFolder="$(PublishDir)Steam\"
           Condition="Exists('$(SteamworksNativeDll)')" />
   </Target>
 

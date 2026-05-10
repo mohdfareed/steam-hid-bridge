@@ -14,7 +14,8 @@ The Windows app is the Steam-launched bridge host. It keeps Steam focused on the
 - Published builds are self-contained for the selected Windows runtime.
 - User data lives under `%LOCALAPPDATA%\SteamHidBridge`, outside the install folder.
 - The UI is organized into native WPF tabs for profile editing, general settings, output preview, and diagnostics.
-- The Settings tab stores input mode, output mode, board serial port, Steam ROM Manager manifest path, app data access, firmware update, driver install status, and release update actions.
+- The Profile tab stores each game's input mode, output mode, launch data, and receiver processes. The Settings tab stores app-wide theme, board serial port, Steam ROM Manager manifest path, app data access, firmware update, and release update actions.
+- Startup does not rewrite settings, SRM manifests, or Steam Input files. Those changes happen only on explicit save/export/apply actions.
 
 ## Folders
 
@@ -33,8 +34,6 @@ SteamHidBridge.App/
 {
   "general": {
     "theme": "system",
-    "inputMode": "legacyMouse",
-    "outputMode": "board",
     "boardPort": "auto",
     "srmManifestPath": "%LOCALAPPDATA%\\SteamHidBridge\\srm\\games.json"
   },
@@ -44,6 +43,8 @@ SteamHidBridge.App/
       "executable": "C:\\Games\\Example\\ExampleLauncher.exe",
       "arguments": "--launch-example",
       "workingDirectory": "C:\\Games\\Example",
+      "inputMode": "legacyMouse",
+      "outputMode": "board",
       "receiverProcesses": [ "ExampleGame.exe" ]
     }
   }
@@ -52,17 +53,17 @@ SteamHidBridge.App/
 
 The app stores profiles at `%LOCALAPPDATA%\SteamHidBridge\appsettings.json`.
 
-`inputMode` is `legacyMouse` or `steamInputActions`. The UI labels these as `Virtual Mouse` and `Steam Input`. `legacyMouse` observes Steam's virtual mouse output through Raw Input. `steamInputActions` polls the app's Steam Input game actions through Steamworks.NET; bind those actions in Steam's controller layout UI.
+Each profile has an `inputMode` of `legacyMouse` or `steamInputActions`. The UI labels these as `Virtual Mouse` and `Steam Input`. `legacyMouse` observes Steam's virtual mouse output through Raw Input. `steamInputActions` polls the app's bundled Steam Input action manifest through Steamworks.NET; Steam binds those actions through the shortcut's controller layout UI when the app is launched from Steam.
 
-`outputMode` is `visualizeOnly`, `board`, or `virtualMouseDriver`. The driver mode uses the packaged KMDF/VHF driver device interface when installed. Driver installation is disabled in the UI until the signing/test-mode path is resolved.
+Each profile has an `outputMode` of `none`, `board`, or `virtualMouse`. The driver mode uses the packaged KMDF/VHF driver device interface when installed through the packaged driver script.
 
 `boardPort` is a COM port number such as `7`, or `auto` to try available serial ports. In the UI, leave the field empty for auto.
 
-The General section writes a Steam ROM Manager manifest JSON file for all profiles. By default this is `%LOCALAPPDATA%\SteamHidBridge\srm\games.json`, but the path is configurable in app settings so SRM configuration can live in a separate dotfiles or cloud-synced setup.
+The General section writes a Steam ROM Manager manifest JSON file for all profiles when you save settings or use `Export SRM`. By default this is `%LOCALAPPDATA%\SteamHidBridge\srm\games.json`, but the path is configurable in app settings so SRM configuration can live in a separate dotfiles or cloud-synced setup.
 
 ## Steam Notes
 
-When a configured receiver owns the foreground window, the app requests Steam config forcing with `steam://forceinputappid/<appid>`. It resets with `steam://forceinputappid/0` when foreground is lost or the bridge exits. Steam normally provides the app id in the launch environment.
+When a configured receiver owns the foreground window, the app requests Steam config forcing with `steam://forceinputappid/<appid>`. It resets with `steam://forceinputappid/0` when foreground is lost or the bridge exits. The app id is only used for this config-forcing path.
 
 Launch mode keeps the main window hidden behind the tray icon. Do not put Steam layout editing, VDF rewriting, automatic layout import/export, or overlay-host workarounds in v1.
 

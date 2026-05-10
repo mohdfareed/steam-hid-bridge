@@ -15,7 +15,7 @@ namespace SteamHidBridge.App.Ui.ViewModels;
 
 public sealed partial class MainWindowViewModel : INotifyPropertyChanged
 {
-    public sealed record SettingOption<T>(T Value, string Label);
+    public sealed record SettingOption<T>(T Value, string Label, bool IsEnabled = true, string ToolTip = "");
 
     private readonly BridgeLaunchOptions launchOptions;
     private readonly AppSettingsStore settingsStore;
@@ -31,7 +31,6 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private readonly Action<Action> dispatch;
     private readonly string appDataPath = AppDataPaths.RootDirectory;
     private readonly string activeProfileId;
-    private readonly string driverInstallText = "Packaged; install disabled until signing/test mode is resolved.";
     private string selectedGameId = string.Empty;
     private string editGameId = string.Empty;
     private string editTitle = string.Empty;
@@ -47,8 +46,6 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private GameProfile savedProfile = new();
     private string savedSrmManifestPath = string.Empty;
     private string savedBoardPort = string.Empty;
-    private BridgeInputMode savedInputMode;
-    private BridgeOutputMode savedOutputMode;
     private AppTheme savedTheme;
     private AppTheme selectedTheme;
     private bool isReloadingGameIds;
@@ -58,7 +55,6 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private readonly AsyncRelayCommand saveGameCommand;
     private readonly AsyncRelayCommand launchGameCommand;
     private readonly AsyncRelayCommand saveGeneralCommand;
-    private readonly AsyncRelayCommand applySteamInputActionsCommand;
     private readonly AsyncRelayCommand updateFirmwareCommand;
 
     public MainWindowViewModel(
@@ -94,17 +90,14 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         saveGameCommand = new AsyncRelayCommand(SaveGameAsync, CanSaveProfile);
         launchGameCommand = new AsyncRelayCommand(LaunchGameAsync, CanSaveOrLaunchProfile);
         saveGeneralCommand = new AsyncRelayCommand(SaveGeneralAsync, HasGeneralChanges);
-        applySteamInputActionsCommand = new AsyncRelayCommand(ApplySteamInputActionsAsync, CanApplySteamInputActions);
         SaveGameCommand = saveGameCommand;
         LaunchGameCommand = launchGameCommand;
         SaveGeneralCommand = saveGeneralCommand;
         ExportSrmManifestCommand = new AsyncRelayCommand(ExportSrmManifestAsync);
-        ApplySteamInputActionsCommand = applySteamInputActionsCommand;
         updateFirmwareCommand = new AsyncRelayCommand(UpdateFirmwareAsync);
         UpdateFirmwareCommand = updateFirmwareCommand;
         CheckForUpdateCommand = new AsyncRelayCommand(CheckForUpdateAsync);
         OpenAppDataCommand = new AsyncRelayCommand(OpenAppDataAsync);
-        InstallDriverCommand = new AsyncRelayCommand(InstallDriverAsync, () => false);
 
         ReloadGameIds(launchOptions.ProfileId);
         SetActivity($"Ready. profile={selectedGameId}");
@@ -132,20 +125,18 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     ];
     public ObservableCollection<SettingOption<BridgeOutputMode>> OutputModeOptions { get; } =
     [
-        new(BridgeOutputMode.VisualizeOnly, "None"),
+        new(BridgeOutputMode.None, "None"),
         new(BridgeOutputMode.Board, "Physical Mouse"),
-        new(BridgeOutputMode.VirtualMouseDriver, "Virtual Mouse")
+        new(BridgeOutputMode.VirtualMouse, "Virtual Mouse", false, "Disabled while the virtual mouse driver is still in development.")
     ];
     public ICommand NewGameCommand { get; }
     public ICommand SaveGameCommand { get; }
     public ICommand LaunchGameCommand { get; }
     public ICommand SaveGeneralCommand { get; }
     public ICommand ExportSrmManifestCommand { get; }
-    public ICommand ApplySteamInputActionsCommand { get; }
     public ICommand UpdateFirmwareCommand { get; }
     public ICommand CheckForUpdateCommand { get; }
     public ICommand OpenAppDataCommand { get; }
-    public ICommand InstallDriverCommand { get; }
 
     public string SelectedGameId
     {
@@ -293,8 +284,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
             if (SetProperty(ref selectedInputMode, value))
             {
                 applyInputMode(value);
-                applySteamInputActionsCommand.RaiseCanExecuteChanged();
-                saveGeneralCommand.RaiseCanExecuteChanged();
+                RaiseProfileCommandStateChanged();
             }
         }
     }
@@ -307,7 +297,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
             if (SetProperty(ref selectedOutputMode, value))
             {
                 applyOutputMode(value);
-                saveGeneralCommand.RaiseCanExecuteChanged();
+                RaiseProfileCommandStateChanged();
             }
         }
     }
@@ -359,7 +349,6 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     public string StatusBrush => isForwardingActive ? "SeaGreen" : "Gray";
     public bool ActivityIsError => isActivityError;
     public string VersionText => appUpdater.CurrentVersionText;
-    public string DriverInstallText => driverInstallText;
     public string BoardFirmwareText => boardFirmwareUpdater.StatusText;
     public string ActiveProfileText => string.IsNullOrWhiteSpace(activeProfileId) ? "No active profile" : $"Active profile: {activeProfileId}";
     public string TrayText => string.IsNullOrWhiteSpace(activeProfileId) ? "No profile" : $"Profile: {activeProfileId}";
@@ -409,8 +398,6 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private bool HasGeneralChanges()
     {
         return savedTheme != SelectedTheme
-            || savedInputMode != SelectedInputMode
-            || savedOutputMode != SelectedOutputMode
             || !string.Equals(SerialPortSelection.Normalize(savedBoardPort), SerialPortSelection.Normalize(BoardPort), StringComparison.Ordinal)
             || !string.Equals(savedSrmManifestPath, SrmManifestPath.Trim(), StringComparison.Ordinal);
     }

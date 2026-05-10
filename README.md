@@ -52,12 +52,13 @@ dotnet run --project .\app\SteamHidBridge.App -- --profile game-profile --launch
 
 1. Install or publish the Windows app.
 2. Start the app from the Desktop shortcut.
-3. Create game profiles and copy the manifest path to the clipboard.
+3. Create game profiles and save them.
 4. Create a Steam Rom Manager manual parser, providing the app's manifest path.
    * Parser type: `Manual`
    * Steam directory: `${steamdirglobal}`
    * Manifests directory: Paste from the app's settings (e.g. `~\AppData\Local\SteamHidBridge\srm`)
 5. Launch a generated Steam shortcut.
+6. If you changed a profile that uses Steam Input, save the profile and relaunch the bridge from that same Steam shortcut.
 
 ## Layout
 

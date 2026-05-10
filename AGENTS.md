@@ -24,7 +24,7 @@ Do not build around Steam Desktop Configuration. Do not require manual Steam Des
 
 The v1 output scope is keyboard and mouse HID. Native controller or DualSense-style gyro emulation is outside scope unless explicitly added later after evaluating firmware complexity, device identity, and anti-cheat risk.
 
-Software virtual HID output lives behind a separate VHF/KMDF driver boundary. Do not use `SendInput` as a serious output backend. The driver package should be built and deployed with the app, but driver installation stays disabled in the GUI until the signing/test-mode path is resolved.
+Software virtual HID output lives behind a separate VHF/KMDF driver boundary. Do not use `SendInput` as a serious output backend. The driver package should be built and deployed with the app, and driver installation is handled by the packaged driver install script rather than a GUI control.
 
 ## Constraints
 
@@ -83,6 +83,7 @@ The profile model must distinguish:
 
 - Steam shortcut/profile: the Steam-side configuration selected by launching a specific Steam shortcut.
 - Game profile: app-side metadata stored in `%LOCALAPPDATA%\SteamHidBridge\appsettings.json`, keyed by id, with executable, arguments, working directory, and receiver process names.
+- Game profile also owns input mode and output mode. These are not app-wide settings.
 - Steam Input action sets: in-profile modes such as gameplay, menu, buy menu, or shop; do not repurpose these as separate games.
 
 Use current official documentation for platform APIs, libraries, and tooling.
@@ -98,18 +99,18 @@ Use current official documentation for platform APIs, libraries, and tooling.
 - Multiple instances may save `appsettings.json`; writes must use the settings-store mutex and atomic write path so profile saves merge with the latest file contents.
 - Output is always previewed in the app model. Physical board transport must only run while a configured receiver process is the foreground process.
 - Steam ROM Manager export should generate bridge-targeted shortcuts, not game-targeted shortcuts. Each generated entry should launch the bridge with `--profile <id> --launch`; the selected profile then launches the configured game executable.
-- General app settings live under the `general` JSON object. It contains `theme` (`system`, `light`, or `dark`) and `srmManifestPath`, which defaults under `%LOCALAPPDATA%\SteamHidBridge\srm\games.json`. Theme selection must use WPF's built-in Fluent `ThemeMode` API, not custom control templates. Do not mutate SRM's own parser configuration unless explicitly requested.
+- General app settings live under the `general` JSON object. It contains `theme` (`system`, `light`, or `dark`), `boardPort`, and `srmManifestPath`, which defaults under `%LOCALAPPDATA%\SteamHidBridge\srm\games.json`. Theme selection must use WPF's built-in Fluent `ThemeMode` API, not custom control templates. Do not mutate SRM's own parser configuration unless explicitly requested.
 - Do not inject a synthetic `default` profile. If no profile is requested, select an existing profile; create a local `new-game` entry only when there are no profiles loaded.
 - Publish output should be self-contained single-file for the selected Windows runtime unless the user asks for framework-dependent deployment. Publish always includes the app, `Driver`, `Firmware`, and `Steam` artifacts. The GUI decides which output systems are active.
 - Release tags use `vMAJOR.MINOR.PATCH`, for example `v0.1.1`. Tag pushes matching that shape build, test, package, and create a GitHub Release with `SteamHidBridge-win-x64.zip`.
 - The installer script lives at `scripts/install.ps1`, downloads from GitHub Releases, replaces the install folder, and creates a Desktop shortcut. User data must live outside the install folder.
 - App updates use GitHub Releases. The app checks the latest release, asks for confirmation, downloads the versioned `SteamHidBridge-update.ps1` release asset, closes all bridge instances, and replaces the published app folder. Do not bundle updater logic in the app package, and do not make the running process overwrite its own executable directly.
 - Runtime settings and logs belong under `%LOCALAPPDATA%\SteamHidBridge\`. Keep app lifecycle/error logging in `logs/app.log` and updater wrapper output in `logs/update.log`; do not add new ad hoc log files without a documented need.
-- Startup may refresh app-owned derived files: normalize/write `appsettings.json`, regenerate the configured SRM manifest, and write Steam Input action manifests only when Steam Input mode is selected. Startup must not mutate Steam caches, SRM parser config, controller layouts, or Steam shortcut databases.
+- Startup must not rewrite settings, regenerate the SRM manifest, or write Steam Input action manifests. Startup must not mutate Steam caches, SRM parser config, controller layouts, or Steam shortcut databases.
 - Steam Input config forcing uses Steam's official `steam://forceinputappid/<appid>` URL only while the configured receiver is foreground, and resets with `steam://forceinputappid/0` when foreground is lost or the bridge exits.
-- Input modes are `legacyMouse` and `steamInputActions`, labeled in the UI as `Virtual Mouse` and `Steam Input`. Legacy mouse observes Steam's virtual mouse output through Windows Raw Input. Steam Input uses Steamworks.NET/ISteamInput to poll game actions defined by the bridge action manifest.
-- The Steam Input action manifest should stay minimal: one `BridgeMouse` action set, one `absolute_mouse` pointer action, and digital actions for left/right/middle/back/forward click plus wheel up/down. Only write or apply this manifest when Steam Input mode is selected. Provide an explicit UI button for applying it; automation may run on save/startup, but explicit setup actions must remain visible.
-- Mouse frames flow through `BridgeRuntime` to the GUI preview at a throttled display rate and to the selected output mode after foreground receiver gating passes. Supported output modes are visualize-only, board USB serial transport, and the packaged virtual mouse driver.
+- Input modes are profile-scoped. They are `legacyMouse` and `steamInputActions`, labeled in the UI as `Virtual Mouse` and `Steam Input`. Legacy mouse observes Steam's virtual mouse output through Windows Raw Input. Steam Input uses Steamworks.NET/ISteamInput to poll game actions defined by the bridge action manifest.
+- The Steam Input action manifest should stay minimal: one `BridgeMouse` action set, one `absolute_mouse` pointer action, and digital actions for left/right/middle/back/forward click plus wheel up/down. Steam Input uses the bundled manifest when launched from Steam; do not reintroduce a separate UI apply/export flow or write into Steam controller_config.
+- Mouse frames flow through `BridgeRuntime` to the GUI preview at a throttled display rate and to the profile-selected output mode after foreground receiver gating passes. Supported output modes are visualize-only, board USB serial transport, and the packaged virtual mouse driver.
 - Shared C# protocol library for frame encoding, validation, and the HID input payload.
 - MSTest protocol tests for synthetic input and malformed-frame handling.
 - PlatformIO firmware placeholder for Teensy 4.0.
