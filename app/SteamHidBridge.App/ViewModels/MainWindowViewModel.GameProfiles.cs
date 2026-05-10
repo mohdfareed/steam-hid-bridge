@@ -24,7 +24,7 @@ public sealed partial class MainWindowViewModel
     {
         if (string.IsNullOrWhiteSpace(EditGameId))
         {
-            SetActivity("Cannot save without an id.");
+            SetError("Cannot save without an id.");
             return Task.CompletedTask;
         }
 
@@ -36,7 +36,7 @@ public sealed partial class MainWindowViewModel
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException or InvalidOperationException)
         {
-            SetActivity($"Save failed: {ex.Message}");
+            SetError($"Save failed: {ex.Message}");
             return Task.CompletedTask;
         }
 
@@ -60,22 +60,23 @@ public sealed partial class MainWindowViewModel
         return Task.CompletedTask;
     }
 
-    private Task WriteSteamRomManagerManifestAsync()
+    private Task SaveGeneralAsync()
     {
-        return WriteSrmManifestAsync(showSuccess: true, persistPath: true);
+        settingsStore.SaveGeneral(SelectedTheme, SrmManifestPath);
+        return WriteSrmManifestAsync(showSuccess: true);
     }
 
     private Task WriteSrmManifestOnStartup()
     {
-        return WriteSrmManifestAsync(showSuccess: false, persistPath: false);
+        return WriteSrmManifestAsync(showSuccess: false);
     }
 
-    private Task WriteSrmManifestAsync(bool showSuccess, bool persistPath)
+    private Task WriteSrmManifestAsync(bool showSuccess)
     {
         string executable = Environment.ProcessPath ?? string.Empty;
         if (string.IsNullOrWhiteSpace(executable))
         {
-            SetActivity("Could not find bridge executable path.");
+            SetError("Could not find bridge executable path.");
             return Task.CompletedTask;
         }
 
@@ -83,7 +84,7 @@ public sealed partial class MainWindowViewModel
         string manifestPath = ExpandPath(SrmManifestPath);
         if (string.IsNullOrWhiteSpace(manifestPath))
         {
-            SetActivity("Steam ROM Manager manifest path is empty.");
+            SetError("Steam ROM Manager manifest path is empty.");
             return Task.CompletedTask;
         }
 
@@ -94,23 +95,18 @@ public sealed partial class MainWindowViewModel
             {
                 _ = Directory.CreateDirectory(directory);
             }
-
             File.WriteAllText(manifestPath, json);
-            if (persistPath)
-            {
-                settingsStore.SaveSrmManifestPath(SrmManifestPath);
-            }
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException or InvalidOperationException)
         {
-            SetActivity($"Could not write Steam ROM Manager manifest: {ex.Message}");
+            SetError($"Could not write Steam ROM Manager manifest: {ex.Message}");
             return Task.CompletedTask;
         }
 
         AppLog.Write($"srm manifest written path={manifestPath} profiles={settingsStore.Document.Games.Count}");
         if (showSuccess)
         {
-            SetActivity($"Wrote Steam ROM Manager manifest for {settingsStore.Document.Games.Count} profile(s).");
+            SetActivity($"Saved general settings and wrote manifest for {settingsStore.Document.Games.Count} profile(s).");
         }
 
         return Task.CompletedTask;
@@ -208,7 +204,8 @@ public sealed partial class MainWindowViewModel
         editArguments = profile.Arguments;
         editWorkingDirectory = profile.WorkingDirectory;
         editReceiverProcessesText = string.Join(", ", profile.ReceiverProcesses);
-        srmManifestPath = settingsStore.Document.SrmManifestPath;
+        srmManifestPath = settingsStore.Document.General.SrmManifestPath;
+        selectedTheme = settingsStore.Document.General.Theme;
         runtime.SetProfile(gameId, profile);
 
         OnPropertyChanged(nameof(SelectedGameId));
@@ -219,10 +216,13 @@ public sealed partial class MainWindowViewModel
         OnPropertyChanged(nameof(EditWorkingDirectory));
         OnPropertyChanged(nameof(EditReceiverProcessesText));
         OnPropertyChanged(nameof(SrmManifestPath));
+        OnPropertyChanged(nameof(SelectedTheme));
         OnPropertyChanged(nameof(ProfileText));
         OnPropertyChanged(nameof(ReceiverProcessesText));
-        OnPropertyChanged(nameof(InstanceText));
+        OnPropertyChanged(nameof(ProfileInstanceText));
+        OnPropertyChanged(nameof(ProcessText));
         OnPropertyChanged(nameof(WindowTitle));
+        RaiseProfileCommandStateChanged();
     }
 
     private GameProfile ReadEditorProfile()

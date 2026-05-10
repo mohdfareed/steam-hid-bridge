@@ -8,7 +8,7 @@ using SteamHidBridge.App.Windows;
 
 namespace SteamHidBridge.App.Runtime;
 
-public sealed class GameProcessHost(Action<string> setActivity) : IDisposable
+public sealed class GameProcessHost(Action<string, bool> setActivity) : IDisposable
 {
     private ChildProcessJob? childProcessJob;
     private Process? process;
@@ -20,19 +20,19 @@ public sealed class GameProcessHost(Action<string> setActivity) : IDisposable
     {
         if (string.IsNullOrWhiteSpace(profile.Executable))
         {
-            setActivity("No executable configured.");
+            setActivity("No executable configured.", true);
             return;
         }
 
         if (!File.Exists(profile.Executable))
         {
-            setActivity($"Executable not found: {profile.Executable}");
+            setActivity($"Executable not found: {profile.Executable}", true);
             return;
         }
 
         if (process is { HasExited: false })
         {
-            setActivity("A launched process is already running.");
+            setActivity("A launched process is already running.", true);
             return;
         }
 
@@ -52,16 +52,16 @@ public sealed class GameProcessHost(Action<string> setActivity) : IDisposable
 
             if (launchedProcess is null)
             {
-                setActivity("Launch failed: process was not created.");
+                setActivity("Launch failed: process was not created.", true);
                 return;
             }
 
             Track(launchedProcess);
-            setActivity($"Launched {id}.");
+            setActivity($"Launched {id}.", false);
         }
         catch (Exception ex) when (ex is InvalidOperationException or Win32Exception)
         {
-            setActivity($"Launch failed: {ex.Message}");
+            setActivity($"Launch failed: {ex.Message}", true);
         }
     }
 
@@ -71,13 +71,13 @@ public sealed class GameProcessHost(Action<string> setActivity) : IDisposable
         {
             if (process is { HasExited: false } runningProcess)
             {
-                setActivity($"Stopping launched process {runningProcess.Id}.");
+                setActivity($"Stopping launched process {runningProcess.Id}.", false);
                 runningProcess.Kill(entireProcessTree: true);
             }
         }
         catch (Exception ex) when (ex is InvalidOperationException or Win32Exception)
         {
-            setActivity($"Could not stop launched process: {ex.Message}");
+            setActivity($"Could not stop launched process: {ex.Message}", true);
         }
         finally
         {
@@ -104,7 +104,7 @@ public sealed class GameProcessHost(Action<string> setActivity) : IDisposable
         launchedProcess.Exited += (_, _) =>
         {
             HasExited = true;
-            setActivity($"Launched process exited: {launchedProcess.Id}");
+            setActivity($"Launched process exited: {launchedProcess.Id}", false);
         };
 
         if (TryTrackProcessTree(launchedProcess))

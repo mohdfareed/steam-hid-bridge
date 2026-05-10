@@ -24,7 +24,6 @@ public sealed class BridgeRuntime : IDisposable
     private string profileId = "";
     private GameProfile profile = new();
     private bool isDisposed;
-    private string activityText = "Ready";
 
     public BridgeRuntime(BridgeLaunchOptions launchOptions, IEnumerable<IMouseInputConsumer> forwardingConsumers)
     {
@@ -37,6 +36,7 @@ public sealed class BridgeRuntime : IDisposable
 
     public event Action<MouseInputFrame>? MouseInput;
     public event Action<BridgeRuntimeStatus>? StatusChanged;
+    public event Action<string, bool>? ActivityChanged;
     public event Action<int>? ExitRequested;
 
     public void SetProfile(string id, GameProfile value)
@@ -129,11 +129,6 @@ public sealed class BridgeRuntime : IDisposable
 
         PublishStatus(gateResult.StatusText);
 
-        string steamInputStatus = steamMouseInputEmitter.StatusText;
-        if (!string.IsNullOrWhiteSpace(steamInputStatus) && !string.Equals(activityText, steamInputStatus, StringComparison.Ordinal))
-        {
-            SetActivity(steamInputStatus);
-        }
     }
 
     private void PublishStatus(string forwardingText)
@@ -143,10 +138,10 @@ public sealed class BridgeRuntime : IDisposable
             ? "input loop starting"
             : $"poll {statistics.PollsPerSecond:F0}/s, frames {statistics.FramesPerSecond:F0}/s";
 
-        StatusChanged?.Invoke(new BridgeRuntimeStatus(forwardingGate.IsForwarding, forwardingText, activityText, inputLoopText));
+        StatusChanged?.Invoke(new BridgeRuntimeStatus(forwardingGate.IsForwarding, forwardingText, inputLoopText));
     }
 
-    private void SetActivity(string value)
+    private void SetActivity(string value, bool isError = false)
     {
         if (isDisposed)
         {
@@ -154,14 +149,14 @@ public sealed class BridgeRuntime : IDisposable
             return;
         }
 
-        activityText = value;
         AppLog.Write(value);
+        ActivityChanged?.Invoke(value, isError);
         PublishStatus(forwardingGate.IsForwarding ? "Forwarding on" : "Forwarding off");
     }
 
     private void RequestExit(string reason)
     {
-        SetActivity(reason);
+        SetActivity(reason, isError: true);
         ExitRequested?.Invoke(0);
     }
 

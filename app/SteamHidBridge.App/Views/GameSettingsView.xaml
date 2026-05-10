@@ -5,7 +5,6 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
         <GroupBox Header="Profile">
@@ -25,7 +24,8 @@
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
 
-                <TextBlock Text="Entry" VerticalAlignment="Center" />
+                <TextBlock Text="Entry"
+                           VerticalAlignment="Center" />
                 <DockPanel Grid.Column="1">
                     <Button DockPanel.Dock="Right"
                             Content="New"
@@ -37,69 +37,141 @@
                               ToolTip="Select a saved profile." />
                 </DockPanel>
 
-                <TextBlock Grid.Row="1" Text="Id" Margin="0,8,0,0" VerticalAlignment="Center" />
-                <TextBox Grid.Row="1" Grid.Column="1" Margin="0,8,0,0" Text="{Binding EditGameId, UpdateSourceTrigger=PropertyChanged}" ToolTip="Profile id used by --profile." />
+                <TextBlock Grid.Row="1"
+                           Text="Id *"
+                           Margin="0,8,0,0"
+                           VerticalAlignment="Center" />
+                <TextBox Grid.Row="1"
+                         Grid.Column="1"
+                         Margin="0,8,0,0"
+                         Text="{Binding EditGameId, UpdateSourceTrigger=PropertyChanged}"
+                         ToolTip="Profile id used by --profile." />
 
-                <TextBlock Grid.Row="2" Text="Title" Margin="0,8,0,0" VerticalAlignment="Center" />
-                <TextBox Grid.Row="2" Grid.Column="1" Margin="0,8,0,0" Text="{Binding EditTitle, UpdateSourceTrigger=PropertyChanged}" ToolTip="Display name for this profile." />
+                <TextBlock Grid.Row="2"
+                           Text="Title"
+                           Margin="0,8,0,0"
+                           VerticalAlignment="Center" />
+                <TextBox Grid.Row="2"
+                         Grid.Column="1"
+                         Margin="0,8,0,0"
+                         Text="{Binding EditTitle, UpdateSourceTrigger=PropertyChanged}"
+                         ToolTip="Display name for this profile." />
 
-                <TextBlock Grid.Row="3" Text="Executable" Margin="0,8,0,0" VerticalAlignment="Center" />
-                <TextBox Grid.Row="3" Grid.Column="1" Margin="0,8,0,0" Text="{Binding EditExecutable, UpdateSourceTrigger=PropertyChanged}" ToolTip="Executable launched by this profile." />
+                <TextBlock Grid.Row="3"
+                           Text="Executable *"
+                           Margin="0,8,0,0"
+                           VerticalAlignment="Center" />
+                <TextBox Grid.Row="3"
+                         Grid.Column="1"
+                         Margin="0,8,0,0"
+                         Text="{Binding EditExecutable, UpdateSourceTrigger=PropertyChanged}"
+                         ToolTip="Executable launched by this profile." />
 
-                <TextBlock Grid.Row="4" Text="Args" Margin="0,8,0,0" VerticalAlignment="Center" />
-                <TextBox Grid.Row="4" Grid.Column="1" Margin="0,8,0,0" Text="{Binding EditArguments, UpdateSourceTrigger=PropertyChanged}" ToolTip="Launch arguments for the executable." />
+                <TextBlock Grid.Row="4"
+                           Text="Args"
+                           Margin="0,8,0,0"
+                           VerticalAlignment="Center" />
+                <TextBox Grid.Row="4"
+                         Grid.Column="1"
+                         Margin="0,8,0,0"
+                         Text="{Binding EditArguments, UpdateSourceTrigger=PropertyChanged}"
+                         ToolTip="Launch arguments for the executable." />
 
-                <TextBlock Grid.Row="5" Text="Working dir" Margin="0,8,0,0" VerticalAlignment="Center" />
-                <TextBox Grid.Row="5" Grid.Column="1" Margin="0,8,0,0" Text="{Binding EditWorkingDirectory, UpdateSourceTrigger=PropertyChanged}" ToolTip="Working directory for the launched process." />
+                <TextBlock Grid.Row="5"
+                           Text="Working dir"
+                           Margin="0,8,0,0"
+                           VerticalAlignment="Center" />
+                <TextBox Grid.Row="5"
+                         Grid.Column="1"
+                         Margin="0,8,0,0"
+                         Text="{Binding EditWorkingDirectory, UpdateSourceTrigger=PropertyChanged}"
+                         ToolTip="Working directory for the launched process." />
 
-                <TextBlock Grid.Row="6" Text="Receivers" Margin="0,8,0,0" VerticalAlignment="Center" />
-                <TextBox Grid.Row="6" Grid.Column="1" Margin="0,8,0,0" Text="{Binding EditReceiverProcessesText, UpdateSourceTrigger=PropertyChanged}" ToolTip="Process names that enable forwarding when foreground." />
+                <TextBlock Grid.Row="6"
+                           Text="Receivers *"
+                           Margin="0,8,0,0"
+                           VerticalAlignment="Center" />
+                <TextBox Grid.Row="6"
+                         Grid.Column="1"
+                         Margin="0,8,0,0"
+                         Text="{Binding EditReceiverProcessesText, UpdateSourceTrigger=PropertyChanged}"
+                         ToolTip="Process names that enable forwarding when foreground." />
 
-                <StackPanel Grid.Row="7" Grid.Column="1" Orientation="Horizontal" Margin="0,12,0,0">
-                    <Button Content="Save" Command="{Binding SaveGameCommand}" ToolTip="Save this profile." />
-                    <Button Content="Launch" Margin="8,0,0,0" Command="{Binding LaunchGameCommand}" ToolTip="Launch this profile's executable." />
+                <StackPanel Grid.Row="7"
+                            Grid.Column="1"
+                            Orientation="Horizontal"
+                            HorizontalAlignment="Right"
+                            Margin="0,12,0,0">
+                    <Button Content="Save"
+                            Margin="0,0,8,0"
+                            Command="{Binding SaveGameCommand}"
+                            ToolTip="Save this profile." />
+                    <Button Content="Launch"
+                            Command="{Binding LaunchGameCommand}"
+                            ToolTip="Launch this profile's executable." />
                 </StackPanel>
             </Grid>
         </GroupBox>
 
-        <GroupBox Grid.Row="1" Header="Steam ROM Manager" Margin="0,16,0,0">
+        <GroupBox Grid.Row="1"
+                  Header="General"
+                  Margin="0,16,0,0">
             <Grid>
                 <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="118" />
                     <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
 
-                <TextBlock Text="Manifest" VerticalAlignment="Center" />
-                <TextBox Grid.Column="1"
+                <TextBlock Text="Theme"
+                           VerticalAlignment="Center" />
+                <ComboBox Grid.Column="1"
+                          Grid.ColumnSpan="2"
+                          ItemsSource="{Binding ThemeOptions}"
+                          SelectedItem="{Binding SelectedTheme}"
+                          ToolTip="Choose the app theme." />
+
+                <TextBlock Grid.Row="1"
+                           Text="SRM manifest"
+                           Margin="0,8,0,0"
+                           VerticalAlignment="Center" />
+                <TextBox Grid.Row="1"
+                         Grid.Column="1"
+                         Grid.ColumnSpan="2"
+                         Margin="0,8,0,0"
                          Text="{Binding SrmManifestPath, UpdateSourceTrigger=PropertyChanged}"
                          ToolTip="Manifest JSON path used by your Steam ROM Manager parser." />
 
-                <Button Grid.Row="1"
-                        Grid.Column="1"
-                        Content="Write Manifest"
-                        HorizontalAlignment="Left"
-                        Margin="0,12,0,0"
-                        MinWidth="132"
-                        Command="{Binding WriteSteamRomManagerManifestCommand}"
-                        ToolTip="Write Steam ROM Manager JSON for every profile." />
-            </Grid>
-        </GroupBox>
-
-        <GroupBox Grid.Row="2" Header="App" Margin="0,16,0,0">
-            <StackPanel Orientation="Horizontal">
-                <TextBlock Text="{Binding VersionText}"
-                           VerticalAlignment="Center"
-                           MinWidth="92"
-                           Margin="0,0,12,0" />
-                <Button Content="Check for Updates"
-                        MinWidth="132"
+                <TextBlock Grid.Row="2"
+                           Text="Version"
+                           Margin="0,8,0,0"
+                           VerticalAlignment="Center" />
+                <TextBlock Grid.Row="2"
+                           Grid.Column="1"
+                           Text="{Binding VersionText}"
+                           Margin="0,8,8,0"
+                           VerticalAlignment="Center" />
+                <Button Grid.Row="2"
+                        Grid.Column="2"
+                        Content="Check for Updates"
+                        Margin="8,8,0,0"
                         Command="{Binding CheckForUpdateCommand}"
                         ToolTip="Check GitHub Releases for a newer version." />
-            </StackPanel>
+
+                <Button Grid.Row="3"
+                        Grid.Column="2"
+                        Content="Save"
+                        HorizontalAlignment="Right"
+                        Margin="0,12,0,0"
+                        Command="{Binding SaveGeneralCommand}"
+                        ToolTip="Save general settings and write Steam ROM Manager JSON." />
+            </Grid>
         </GroupBox>
     </Grid>
 </UserControl>

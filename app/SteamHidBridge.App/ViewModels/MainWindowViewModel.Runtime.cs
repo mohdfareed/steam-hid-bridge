@@ -9,7 +9,6 @@ public sealed partial class MainWindowViewModel
     {
         isForwardingActive = status.ForwardingEnabled;
         ForwardingStatus = status.ForwardingText;
-        ActivityText = status.ActivityText;
         InputLoopText = status.InputLoopText;
         OnPropertyChanged(nameof(StatusBrush));
     }

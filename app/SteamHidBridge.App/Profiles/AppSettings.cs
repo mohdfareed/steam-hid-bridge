@@ -11,9 +11,16 @@ namespace SteamHidBridge.App.Profiles;
 
 public sealed class AppSettings
 {
-    public string SrmManifestPath { get; set; } = "";
+    public GeneralSettings General { get; set; } = new();
 
     public Dictionary<string, GameProfile> Games { get; set; } = [];
+}
+
+public sealed class GeneralSettings
+{
+    public AppTheme Theme { get; set; } = AppTheme.System;
+
+    public string SrmManifestPath { get; set; } = "";
 }
 
 public sealed class AppSettingsStore(string path, AppSettings document)
@@ -22,6 +29,11 @@ public sealed class AppSettingsStore(string path, AppSettings document)
     {
         WriteIndented = true
     };
+
+    static AppSettingsStore()
+    {
+        JsonOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter(JsonNamingPolicy.CamelCase));
+    }
 
     public string FilePath { get; } = path;
     public AppSettings Document { get; } = document;
@@ -52,9 +64,13 @@ public sealed class AppSettingsStore(string path, AppSettings document)
         });
     }
 
-    public void SaveSrmManifestPath(string path)
+    public void SaveGeneral(AppTheme theme, string srmManifestPath)
     {
-        Save(latest => latest.SrmManifestPath = path.Trim());
+        Save(latest =>
+        {
+            latest.General.Theme = theme;
+            latest.General.SrmManifestPath = srmManifestPath.Trim();
+        });
     }
 
     private void Save(Action<AppSettings> update)
@@ -76,7 +92,8 @@ public sealed class AppSettingsStore(string path, AppSettings document)
             update(latest);
             WriteAtomic(FilePath, latest);
 
-            Document.SrmManifestPath = latest.SrmManifestPath;
+            Document.General.Theme = latest.General.Theme;
+            Document.General.SrmManifestPath = latest.General.SrmManifestPath;
             Document.Games.Clear();
             foreach ((string gameId, GameProfile gameProfile) in latest.Games)
             {
@@ -106,9 +123,10 @@ public sealed class AppSettingsStore(string path, AppSettings document)
     private static AppSettings Normalize(AppSettings? document)
     {
         document ??= new AppSettings();
-        if (string.IsNullOrWhiteSpace(document.SrmManifestPath))
+        document.General ??= new GeneralSettings();
+        if (string.IsNullOrWhiteSpace(document.General.SrmManifestPath))
         {
-            document.SrmManifestPath = AppDataPaths.SrmManifestPath;
+            document.General.SrmManifestPath = AppDataPaths.SrmManifestPath;
         }
 
         document.Games ??= [];

@@ -44,12 +44,14 @@ public partial class App : Application
 
             AppSettingsStore settingsStore = AppSettingsStore.LoadDefault();
             AppLog.Write($"settings loaded path={settingsStore.FilePath}");
+            AppThemeManager.Apply(settingsStore.Document.General.Theme);
 
             bridgeRuntime = new BridgeRuntime(launchOptions, []);
             mainWindowViewModel = new MainWindowViewModel(
                 launchOptions,
                 settingsStore,
                 bridgeRuntime,
+                AppThemeManager.Apply,
                 ConfirmUpdate,
                 action => Dispatcher.BeginInvoke(action));
             mainWindowViewModel.ExitRequested += ExitApplication;
@@ -64,7 +66,7 @@ public partial class App : Application
             window.Closed += (_, _) => AppLog.Write("main-window closed");
             MainWindow = window;
 
-            trayIconHost = new TrayIconHost(window, mainWindowViewModel.InstanceText, () => ExitApplication(0));
+            trayIconHost = new TrayIconHost(window, mainWindowViewModel.ProfileInstanceText, () => ExitApplication(0));
             if (launchOptions.LaunchGame)
             {
                 overlayHostWindow = new SteamOverlayHostWindow();

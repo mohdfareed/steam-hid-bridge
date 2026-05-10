@@ -13,7 +13,7 @@ The Windows app is the Steam-launched bridge host. It keeps Steam focused on the
 - The UI can copy Steam ROM Manager JSON for all profiles. Generated entries target the bridge executable and pass `--profile <id> --launch`.
 - Published builds are self-contained for the selected Windows runtime.
 - User data lives under `%LOCALAPPDATA%\SteamHidBridge`, outside the install folder.
-- The App section can check GitHub Releases and start an in-place update. Updates close all bridge instances and replace the published app folder.
+- The General section stores theme, Steam ROM Manager manifest path, and release update actions.
 
 ## Folders
 
@@ -35,6 +35,10 @@ SteamHidBridge.App/
 
 ```json
 {
+  "general": {
+    "theme": "system",
+    "srmManifestPath": "%LOCALAPPDATA%\\SteamHidBridge\\srm\\games.json"
+  },
   "games": {
     "valorant": {
       "title": "Valorant",
@@ -49,7 +53,7 @@ SteamHidBridge.App/
 
 The app stores profiles at `%LOCALAPPDATA%\SteamHidBridge\appsettings.json`.
 
-The Steam ROM Manager section writes a manifest JSON file for all profiles. By default this is `%LOCALAPPDATA%\SteamHidBridge\srm\games.json`, but the path is configurable in app settings so SRM configuration can live in a separate dotfiles or cloud-synced setup.
+The General section writes a Steam ROM Manager manifest JSON file for all profiles. By default this is `%LOCALAPPDATA%\SteamHidBridge\srm\games.json`, but the path is configurable in app settings so SRM configuration can live in a separate dotfiles or cloud-synced setup.
 
 ## Steam Notes
 

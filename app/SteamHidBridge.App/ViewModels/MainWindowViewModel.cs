@@ -20,6 +20,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private readonly AppSettingsStore settingsStore;
     private readonly BridgeRuntime runtime;
     private readonly AppUpdater appUpdater;
+    private readonly Action<AppTheme> applyTheme;
     private readonly Func<AppUpdateCheckResult, bool> confirmUpdate;
     private readonly Action<Action> dispatch;
     private string selectedGameId = string.Empty;
@@ -30,31 +31,40 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private string editWorkingDirectory = string.Empty;
     private string editReceiverProcessesText = string.Empty;
     private string srmManifestPath = string.Empty;
+    private AppTheme selectedTheme;
     private bool isReloadingGameIds;
     private bool isForwardingActive;
+    private bool isActivityError;
     private HidInputReport lastReport;
+    private readonly AsyncRelayCommand saveGameCommand;
+    private readonly AsyncRelayCommand launchGameCommand;
 
     public MainWindowViewModel(
         BridgeLaunchOptions launchOptions,
         AppSettingsStore settingsStore,
         BridgeRuntime runtime,
+        Action<AppTheme> applyTheme,
         Func<AppUpdateCheckResult, bool> confirmUpdate,
         Action<Action> dispatch)
     {
         this.launchOptions = launchOptions;
         this.settingsStore = settingsStore;
         this.runtime = runtime;
+        this.applyTheme = applyTheme;
         this.confirmUpdate = confirmUpdate;
         this.dispatch = dispatch;
         appUpdater = new AppUpdater();
         runtime.MouseInput += frame => dispatch(() => PreviewMouseInput(frame));
         runtime.StatusChanged += status => dispatch(() => ApplyRuntimeStatus(status));
+        runtime.ActivityChanged += (message, isError) => dispatch(() => ApplyActivityMessage(message, isError));
         runtime.ExitRequested += RequestExit;
 
         NewGameCommand = new AsyncRelayCommand(NewGameAsync);
-        SaveGameCommand = new AsyncRelayCommand(SaveGameAsync);
-        LaunchGameCommand = new AsyncRelayCommand(LaunchGameAsync);
-        WriteSteamRomManagerManifestCommand = new AsyncRelayCommand(WriteSteamRomManagerManifestAsync);
+        saveGameCommand = new AsyncRelayCommand(SaveGameAsync, CanSaveOrLaunchProfile);
+        launchGameCommand = new AsyncRelayCommand(LaunchGameAsync, CanSaveOrLaunchProfile);
+        SaveGameCommand = saveGameCommand;
+        LaunchGameCommand = launchGameCommand;
+        SaveGeneralCommand = new AsyncRelayCommand(SaveGeneralAsync);
         CheckForUpdateCommand = new AsyncRelayCommand(CheckForUpdateAsync);
 
         ReloadGameIds(launchOptions.ProfileId);
@@ -68,7 +78,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         }
         else if (launchOptions.LaunchGame)
         {
-            SetActivity("Launch mode requires --profile <id>.");
+            SetError("Launch mode requires --profile <id>.");
         }
     }
 
@@ -76,10 +86,11 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     public event Action<int>? ExitRequested;
 
     public ObservableCollection<string> GameIds { get; } = [];
+    public ObservableCollection<AppTheme> ThemeOptions { get; } = [AppTheme.System, AppTheme.Light, AppTheme.Dark];
     public ICommand NewGameCommand { get; }
     public ICommand SaveGameCommand { get; }
     public ICommand LaunchGameCommand { get; }
-    public ICommand WriteSteamRomManagerManifestCommand { get; }
+    public ICommand SaveGeneralCommand { get; }
     public ICommand CheckForUpdateCommand { get; }
 
     public string SelectedGameId
@@ -111,6 +122,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
             if (SetProperty(ref editGameId, value))
             {
                 OnPropertyChanged(nameof(ProfileText));
+                RaiseProfileCommandStateChanged();
             }
         }
     }
@@ -118,7 +130,13 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     public string EditExecutable
     {
         get => editExecutable;
-        set => SetProperty(ref editExecutable, value);
+        set
+        {
+            if (SetProperty(ref editExecutable, value))
+            {
+                RaiseProfileCommandStateChanged();
+            }
+        }
     }
 
     public string EditTitle
@@ -154,6 +172,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
             {
                 OnPropertyChanged(nameof(ReceiverProcessesText));
                 runtime.SetProfile(selectedGameId, ReadEditorProfile());
+                RaiseProfileCommandStateChanged();
             }
         }
     }
@@ -165,6 +184,18 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     {
         get => srmManifestPath;
         set => SetProperty(ref srmManifestPath, value);
+    }
+
+    public AppTheme SelectedTheme
+    {
+        get => selectedTheme;
+        set
+        {
+            if (SetProperty(ref selectedTheme, value))
+            {
+                applyTheme(value);
+            }
+        }
     }
 
     public string ForwardingStatus
@@ -200,16 +231,45 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     public string MouseBackBrush => MouseButtonBrush(MouseButtons.Back);
     public string MouseForwardBrush => MouseButtonBrush(MouseButtons.Forward);
     public string StatusBrush => isForwardingActive ? "SeaGreen" : "Gray";
-    public string VersionText => $"Version {appUpdater.CurrentVersionText}";
-    public string InstanceText => $"{selectedGameId} - PID {Environment.ProcessId}";
-    public string WindowTitle => $"Steam HID Bridge - {InstanceText}";
+    public bool ActivityIsError => isActivityError;
+    public string VersionText => appUpdater.CurrentVersionText;
+    public string ProfileInstanceText => selectedGameId;
+    public string ProcessText => $"{selectedGameId} - PID {Environment.ProcessId}";
+    public string WindowTitle => string.IsNullOrWhiteSpace(selectedGameId)
+        ? "Steam HID Bridge"
+        : $"Steam HID Bridge - {selectedGameId}";
 
     private string[] ReceiverProcesses => ParseReceiverProcesses(EditReceiverProcessesText);
 
-    private void SetActivity(string message)
+    private void SetActivity(string message, bool isError = false)
     {
-        ActivityText = message;
+        ApplyActivityMessage(message, isError);
         AppLog.Write(message);
+    }
+
+    private void SetError(string message)
+    {
+        SetActivity(message, isError: true);
+    }
+
+    private void ApplyActivityMessage(string message, bool isError)
+    {
+        isActivityError = isError;
+        ActivityText = message;
+        OnPropertyChanged(nameof(ActivityIsError));
+    }
+
+    private bool CanSaveOrLaunchProfile()
+    {
+        return !string.IsNullOrWhiteSpace(EditGameId)
+            && !string.IsNullOrWhiteSpace(EditExecutable)
+            && ReceiverProcesses.Length > 0;
+    }
+
+    private void RaiseProfileCommandStateChanged()
+    {
+        saveGameCommand.RaiseCanExecuteChanged();
+        launchGameCommand.RaiseCanExecuteChanged();
     }
 
     private bool SetProperty<T>(ref T field, T value, [CallerMemberName] string? propertyName = null)

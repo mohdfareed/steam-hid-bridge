@@ -31,7 +31,7 @@ public sealed partial class MainWindowViewModel
         }
         catch (Exception ex)
         {
-            SetActivity($"Update check failed: {ex.Message}");
+            SetError($"Update check failed: {ex.Message}");
         }
     }
 }
