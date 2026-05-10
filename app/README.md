@@ -20,9 +20,10 @@ The Windows app is the Steam-launched bridge host. It keeps Steam focused on the
 ```text
 SteamHidBridge.App/
   Views/            WPF presentation
-  ViewModels/       profile editing, launch lifetime, foreground gate, output preview
+  ViewModels/       WPF binding state and commands
+  Runtime/          process lifetime, foreground gate, Steam forcing, input loop
   Profiles/         appsettings schema and Steam ROM Manager export
-  Input/            mouse emitter/consumer pipeline
+  Input/            mouse frame model and output consumers
   Steam/            Steam Input emitter and config forcing
   Windows/          Win32 foreground/process helpers
   Startup/          command-line parsing

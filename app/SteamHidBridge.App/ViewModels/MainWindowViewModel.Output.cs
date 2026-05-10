@@ -5,14 +5,9 @@ namespace SteamHidBridge.App.ViewModels;
 
 public sealed partial class MainWindowViewModel
 {
-    private void PreviewOutput(HidInputReport report)
-    {
-        SetLastReport(report);
-    }
-
     private void PreviewMouseInput(MouseInputFrame frame)
     {
-        PreviewOutput(new HidInputReport(
+        SetLastReport(new HidInputReport(
             frame.PointerDeltaX,
             frame.PointerDeltaY,
             frame.VerticalWheel,

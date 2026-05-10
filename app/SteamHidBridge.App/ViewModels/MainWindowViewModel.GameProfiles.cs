@@ -1,14 +1,11 @@
 using System;
 using System.Collections.Generic;
-using System.ComponentModel;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
 using SteamHidBridge.App.Infrastructure;
 using SteamHidBridge.App.Profiles;
-using SteamHidBridge.App.Windows;
 
 namespace SteamHidBridge.App.ViewModels;
 
@@ -31,10 +28,11 @@ public sealed partial class MainWindowViewModel
             return Task.CompletedTask;
         }
 
+        GameProfile profile = ReadEditorProfile();
         string newId = EditGameId.Trim();
         try
         {
-            settingsStore.SaveGame(selectedGameId, newId, ReadEditorProfile());
+            settingsStore.SaveGame(selectedGameId, newId, profile);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException or InvalidOperationException)
         {
@@ -57,53 +55,8 @@ public sealed partial class MainWindowViewModel
 
     private Task LaunchGameAsync()
     {
-        GameProfile profile = ReadEditorProfile();
-        if (string.IsNullOrWhiteSpace(profile.Executable))
-        {
-            SetActivity("No executable configured.");
-            return Task.CompletedTask;
-        }
-
-        if (!File.Exists(profile.Executable))
-        {
-            SetActivity($"Executable not found: {profile.Executable}");
-            return Task.CompletedTask;
-        }
-
-        if (launchedProcess is { HasExited: false })
-        {
-            SetActivity("A launched process is already running.");
-            return Task.CompletedTask;
-        }
-
-        string workingDirectory = string.IsNullOrWhiteSpace(profile.WorkingDirectory)
-            ? Path.GetDirectoryName(profile.Executable) ?? AppContext.BaseDirectory
-            : profile.WorkingDirectory;
-
-        try
-        {
-            Process? process = Process.Start(new ProcessStartInfo
-            {
-                FileName = profile.Executable,
-                Arguments = profile.Arguments,
-                WorkingDirectory = workingDirectory,
-                UseShellExecute = false
-            });
-
-            if (process is null)
-            {
-                SetActivity("Launch failed: process was not created.");
-                return Task.CompletedTask;
-            }
-
-            TrackLaunchedProcess(process);
-            SetActivity($"Launched {selectedGameId}.");
-        }
-        catch (Exception ex) when (ex is InvalidOperationException or Win32Exception)
-        {
-            SetActivity($"Launch failed: {ex.Message}");
-        }
-
+        runtime.SetProfile(selectedGameId, ReadEditorProfile());
+        runtime.LaunchProfile();
         return Task.CompletedTask;
     }
 
@@ -161,71 +114,6 @@ public sealed partial class MainWindowViewModel
         }
 
         return Task.CompletedTask;
-    }
-
-    public void StopLaunchedProcesses()
-    {
-        isStoppingLaunchedProcesses = true;
-        statusTimer.Stop();
-        mouseInputLoop.Dispose();
-
-        try
-        {
-            if (launchedProcess is { HasExited: false } process)
-            {
-                SetActivity($"Stopping launched process {process.Id}.");
-                process.Kill(entireProcessTree: true);
-            }
-        }
-        catch (Exception ex) when (ex is InvalidOperationException or Win32Exception)
-        {
-            SetActivity($"Could not stop launched process: {ex.Message}");
-        }
-        finally
-        {
-            launchedProcess?.Dispose();
-            launchedProcess = null;
-            childProcessJob?.Dispose();
-            childProcessJob = null;
-        }
-    }
-
-    private void TrackLaunchedProcess(Process process)
-    {
-        launchedProcess?.Dispose();
-        launchedProcess = process;
-        launchedProcessExited = false;
-        hasSeenReceiverProcess = false;
-
-        process.EnableRaisingEvents = true;
-        process.Exited += (_, _) =>
-        {
-            launchedProcessExited = true;
-            _ = statusTimer.Dispatcher.BeginInvoke(() => SetActivity($"Launched process exited: {process.Id}"));
-        };
-
-        if (TryTrackProcessTree(process))
-        {
-            AppLog.Write($"tracking launched process tree={process.Id}");
-        }
-        else
-        {
-            AppLog.Write($"tracking launched process directly={process.Id}");
-        }
-    }
-
-    private bool TryTrackProcessTree(Process process)
-    {
-        try
-        {
-            childProcessJob ??= new ChildProcessJob();
-            return childProcessJob.TryAdd(process);
-        }
-        catch (Exception ex) when (ex is InvalidOperationException or Win32Exception)
-        {
-            AppLog.WriteException("child-process-job-unavailable", ex);
-            return false;
-        }
     }
 
     private void ReloadGameIds(string requestedId)
@@ -321,7 +209,7 @@ public sealed partial class MainWindowViewModel
         editWorkingDirectory = profile.WorkingDirectory;
         editReceiverProcessesText = string.Join(", ", profile.ReceiverProcesses);
         srmManifestPath = settingsStore.Document.SrmManifestPath;
-        hasSeenReceiverProcess = false;
+        runtime.SetProfile(gameId, profile);
 
         OnPropertyChanged(nameof(SelectedGameId));
         OnPropertyChanged(nameof(EditGameId));

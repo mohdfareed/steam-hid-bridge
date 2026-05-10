@@ -6,12 +6,12 @@ The runtime shape is:
 
 ```text
 SteamMouseInputEmitter
-  -> MouseInputPipeline
-     -> MouseVisualizerConsumer
-     -> TeensyMouseOutputConsumer
+  -> BridgeRuntime
+     -> GUI preview
+     -> future Teensy mouse output consumer
 ```
 
-The visualizer consumer always receives frames so the GUI can show what Steam is producing. The Teensy consumer receives frames only when the configured receiver process owns the foreground window.
+The GUI preview receives every frame so the app can show what Steam is producing. Future physical output consumers must receive frames only when the configured receiver process owns the foreground window.
 
 ## Action Contract
 

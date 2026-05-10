@@ -1,29 +1,17 @@
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using SteamHidBridge.App.Steam;
-using SteamHidBridge.Protocol;
 
 namespace SteamHidBridge.App.Input;
-
-public readonly record struct MouseInputFrame(
-    short PointerDeltaX,
-    short PointerDeltaY,
-    sbyte VerticalWheel,
-    MouseButtons Buttons);
-
-public sealed record MouseInputLoopStatistics(
-    TimeSpan PollInterval,
-    long PollCount,
-    long FrameCount,
-    double PollsPerSecond,
-    double FramesPerSecond);
 
 public sealed class MouseInputLoop : IDisposable
 {
     private static readonly TimeSpan PollInterval = TimeSpan.FromMilliseconds(4);
     private readonly SteamMouseInputEmitter emitter;
-    private readonly MouseInputPipeline pipeline;
+    private readonly Action<MouseInputFrame> previewFrame;
+    private readonly IEnumerable<IMouseInputConsumer> forwardingConsumers;
     private readonly Func<bool> isForwardingEnabled;
     private readonly CancellationTokenSource cancellation = new();
     private readonly Task loopTask;
@@ -32,11 +20,13 @@ public sealed class MouseInputLoop : IDisposable
 
     public MouseInputLoop(
         SteamMouseInputEmitter emitter,
-        MouseInputPipeline pipeline,
+        Action<MouseInputFrame> previewFrame,
+        IEnumerable<IMouseInputConsumer> forwardingConsumers,
         Func<bool> isForwardingEnabled)
     {
         this.emitter = emitter;
-        this.pipeline = pipeline;
+        this.previewFrame = previewFrame;
+        this.forwardingConsumers = forwardingConsumers;
         this.isForwardingEnabled = isForwardingEnabled;
         loopTask = Task.Run(RunAsync);
     }
@@ -84,7 +74,14 @@ public sealed class MouseInputLoop : IDisposable
             if (emitter.TryReadLatest(out MouseInputFrame frame))
             {
                 frameCount++;
-                pipeline.Publish(frame, isForwardingEnabled());
+                previewFrame(frame);
+                if (isForwardingEnabled())
+                {
+                    foreach (IMouseInputConsumer consumer in forwardingConsumers)
+                    {
+                        consumer.Consume(frame);
+                    }
+                }
             }
 
             long now = Environment.TickCount64;

@@ -5,7 +5,9 @@ using System.Windows;
 using System.Windows.Threading;
 using SteamHidBridge.App.Infrastructure;
 using SteamHidBridge.App.Profiles;
+using SteamHidBridge.App.Runtime;
 using SteamHidBridge.App.Startup;
+using SteamHidBridge.App.Updates;
 using SteamHidBridge.App.ViewModels;
 using SteamHidBridge.App.Views;
 
@@ -17,6 +19,7 @@ public partial class App : Application
 {
     private TrayIconHost? trayIconHost;
     private MainWindowViewModel? mainWindowViewModel;
+    private BridgeRuntime? bridgeRuntime;
     private SteamOverlayHostWindow? overlayHostWindow;
     private ShutdownSignalListener? shutdownSignalListener;
     private bool hideMainWindowToTrayOnClose;
@@ -42,7 +45,13 @@ public partial class App : Application
             AppSettingsStore settingsStore = AppSettingsStore.LoadDefault();
             AppLog.Write($"settings loaded path={settingsStore.FilePath}");
 
-            mainWindowViewModel = new MainWindowViewModel(launchOptions, settingsStore);
+            bridgeRuntime = new BridgeRuntime(launchOptions, []);
+            mainWindowViewModel = new MainWindowViewModel(
+                launchOptions,
+                settingsStore,
+                bridgeRuntime,
+                ConfirmUpdate,
+                action => Dispatcher.BeginInvoke(action));
             mainWindowViewModel.ExitRequested += ExitApplication;
             shutdownSignalListener = new ShutdownSignalListener(() => Dispatcher.BeginInvoke(() => ExitApplication(0)));
 
@@ -79,8 +88,7 @@ public partial class App : Application
     protected override void OnExit(ExitEventArgs e)
     {
         isExiting = true;
-        mainWindowViewModel?.ResetSteamInputConfig();
-        mainWindowViewModel?.StopLaunchedProcesses();
+        bridgeRuntime?.Dispose();
         overlayHostWindow?.Close();
         trayIconHost?.Dispose();
         shutdownSignalListener?.Dispose();
@@ -140,5 +148,14 @@ public partial class App : Application
             "Steam HID Bridge",
             MessageBoxButton.OK,
             MessageBoxImage.Error);
+    }
+
+    private static bool ConfirmUpdate(AppUpdateCheckResult update)
+    {
+        return MessageBox.Show(
+            $"Install {update.LatestVersionText}?\n\nThis will close every Steam HID Bridge instance and any game processes launched by them.",
+            "Steam HID Bridge Update",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Question) == MessageBoxResult.Yes;
     }
 }

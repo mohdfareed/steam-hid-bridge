@@ -2,18 +2,14 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
-using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Windows.Input;
-using System.Windows.Media;
-using System.Windows.Threading;
 using SteamHidBridge.App.Infrastructure;
 using SteamHidBridge.App.Input;
 using SteamHidBridge.App.Profiles;
+using SteamHidBridge.App.Runtime;
 using SteamHidBridge.App.Startup;
-using SteamHidBridge.App.Steam;
 using SteamHidBridge.App.Updates;
-using SteamHidBridge.App.Windows;
 using SteamHidBridge.Protocol;
 
 namespace SteamHidBridge.App.ViewModels;
@@ -22,12 +18,10 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
 {
     private readonly BridgeLaunchOptions launchOptions;
     private readonly AppSettingsStore settingsStore;
+    private readonly BridgeRuntime runtime;
     private readonly AppUpdater appUpdater;
-    private readonly SteamInputConfigForcer steamInputConfigForcer;
-    private readonly SteamMouseInputEmitter steamMouseInputEmitter;
-    private readonly MouseInputPipeline mouseInputPipeline;
-    private readonly MouseInputLoop mouseInputLoop;
-    private readonly DispatcherTimer statusTimer;
+    private readonly Func<AppUpdateCheckResult, bool> confirmUpdate;
+    private readonly Action<Action> dispatch;
     private string selectedGameId = string.Empty;
     private string editGameId = string.Empty;
     private string editTitle = string.Empty;
@@ -37,25 +31,25 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private string editReceiverProcessesText = string.Empty;
     private string srmManifestPath = string.Empty;
     private bool isReloadingGameIds;
-    private bool hasSeenReceiverProcess;
     private bool isForwardingActive;
-    private bool isStoppingLaunchedProcesses;
-    private bool launchedProcessExited = true;
-    private ChildProcessJob? childProcessJob;
-    private Process? launchedProcess;
     private HidInputReport lastReport;
 
-    public MainWindowViewModel(BridgeLaunchOptions launchOptions, AppSettingsStore settingsStore)
+    public MainWindowViewModel(
+        BridgeLaunchOptions launchOptions,
+        AppSettingsStore settingsStore,
+        BridgeRuntime runtime,
+        Func<AppUpdateCheckResult, bool> confirmUpdate,
+        Action<Action> dispatch)
     {
         this.launchOptions = launchOptions;
         this.settingsStore = settingsStore;
+        this.runtime = runtime;
+        this.confirmUpdate = confirmUpdate;
+        this.dispatch = dispatch;
         appUpdater = new AppUpdater();
-        steamInputConfigForcer = new SteamInputConfigForcer(launchOptions.SteamAppId);
-        steamMouseInputEmitter = new SteamMouseInputEmitter();
-        mouseInputPipeline = new MouseInputPipeline(
-            [new MouseVisualizerConsumer(frame => _ = System.Windows.Application.Current.Dispatcher.BeginInvoke(() => PreviewMouseInput(frame)))],
-            [new TeensyMouseOutputConsumer()]);
-        mouseInputLoop = new MouseInputLoop(steamMouseInputEmitter, mouseInputPipeline, () => isForwardingActive);
+        runtime.MouseInput += frame => dispatch(() => PreviewMouseInput(frame));
+        runtime.StatusChanged += status => dispatch(() => ApplyRuntimeStatus(status));
+        runtime.ExitRequested += RequestExit;
 
         NewGameCommand = new AsyncRelayCommand(NewGameAsync);
         SaveGameCommand = new AsyncRelayCommand(SaveGameAsync);
@@ -64,19 +58,9 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         CheckForUpdateCommand = new AsyncRelayCommand(CheckForUpdateAsync);
 
         ReloadGameIds(launchOptions.ProfileId);
-
-        statusTimer = new DispatcherTimer
-        {
-            Interval = TimeSpan.FromMilliseconds(250)
-        };
-        statusTimer.Tick += (_, _) => RefreshRuntimeStatus();
-        statusTimer.Start();
-
-        RefreshRuntimeStatus();
         WriteSrmManifestOnStartup();
         SetActivity($"Ready. profile={selectedGameId}");
         AppLog.Write($"settings={settingsStore.FilePath}");
-        AppLog.Write(steamInputConfigForcer.StatusText);
 
         if (launchOptions.LaunchGame && !string.IsNullOrWhiteSpace(launchOptions.ProfileId))
         {
@@ -169,7 +153,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
             if (SetProperty(ref editReceiverProcessesText, value))
             {
                 OnPropertyChanged(nameof(ReceiverProcessesText));
-                RefreshRuntimeStatus();
+                runtime.SetProfile(selectedGameId, ReadEditorProfile());
             }
         }
     }
@@ -187,7 +171,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     {
         get;
         private set => SetProperty(ref field, value);
-    } = "Preview only";
+    } = "Forwarding off";
 
     public string LastOutputText
     {
@@ -210,12 +194,12 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     public string PointerText => $"dx {lastReport.PointerDeltaX}, dy {lastReport.PointerDeltaY}";
     public string WheelText => $"wheel {lastReport.VerticalWheel}";
     public string MouseButtonsText => lastReport.MouseButtons == MouseButtons.None ? "buttons none" : $"buttons {lastReport.MouseButtons}";
-    public Brush MouseLeftBrush => MouseButtonBrush(MouseButtons.Left);
-    public Brush MouseRightBrush => MouseButtonBrush(MouseButtons.Right);
-    public Brush MouseMiddleBrush => MouseButtonBrush(MouseButtons.Middle);
-    public Brush MouseBackBrush => MouseButtonBrush(MouseButtons.Back);
-    public Brush MouseForwardBrush => MouseButtonBrush(MouseButtons.Forward);
-    public Brush StatusBrush => isForwardingActive ? Brushes.SeaGreen : Brushes.Gray;
+    public string MouseLeftBrush => MouseButtonBrush(MouseButtons.Left);
+    public string MouseRightBrush => MouseButtonBrush(MouseButtons.Right);
+    public string MouseMiddleBrush => MouseButtonBrush(MouseButtons.Middle);
+    public string MouseBackBrush => MouseButtonBrush(MouseButtons.Back);
+    public string MouseForwardBrush => MouseButtonBrush(MouseButtons.Forward);
+    public string StatusBrush => isForwardingActive ? "SeaGreen" : "Gray";
     public string VersionText => $"Version {appUpdater.CurrentVersionText}";
     public string InstanceText => $"{selectedGameId} - PID {Environment.ProcessId}";
     public string WindowTitle => $"Steam HID Bridge - {InstanceText}";
@@ -250,14 +234,8 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         ExitRequested?.Invoke(exitCode);
     }
 
-    public void ResetSteamInputConfig()
+    private string MouseButtonBrush(MouseButtons button)
     {
-        steamInputConfigForcer.Reset();
-        mouseInputLoop.Dispose();
-    }
-
-    private SolidColorBrush MouseButtonBrush(MouseButtons button)
-    {
-        return lastReport.MouseButtons.HasFlag(button) ? Brushes.SeaGreen : Brushes.White;
+        return lastReport.MouseButtons.HasFlag(button) ? "SeaGreen" : "White";
     }
 }

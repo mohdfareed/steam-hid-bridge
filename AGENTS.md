@@ -69,6 +69,8 @@ Keep diagnostics separate from the hot path.
 
 Keep business logic decoupled from WPF views. UI should bind to view models and services; protocol, transport, validation, startup behavior, and HID mapping logic must remain testable without constructing WPF controls. The WPF UI should be replaceable later without rewriting app logic.
 
+The Windows app runtime belongs outside WPF views and view models. `Runtime/` owns process lifetime, foreground gating, Steam config forcing, and Steam Input loop orchestration. View models should only expose editable state and commands for WPF binding.
+
 Do not add abstractions, settings, modes, services, or configuration switches unless they are required by the MVP or the user explicitly asks for them. When a use case is unclear, ask before implementing.
 
 Prefer a few focused files over many tiny abstractions. Keep the code easy for a person to read and change.
@@ -103,7 +105,7 @@ Use current official documentation for platform APIs, libraries, and tooling.
 - Runtime settings and logs belong under `%LOCALAPPDATA%\SteamHidBridge\`. Keep app lifecycle/error logging in `logs/app.log` and updater wrapper output in `logs/update.log`; do not add new ad hoc log files without a documented need.
 - Steam Input config forcing uses Steam's official `steam://forceinputappid/<appid>` URL only while the configured receiver is foreground, and resets with `steam://forceinputappid/0` when foreground is lost or the bridge exits.
 - Steam Input integration belongs under `app/SteamHidBridge.App/Steam/`. Keep the real Steamworks API reader isolated there; do not let WPF focus state drive input capture.
-- Steam Input is the only input emitter. Its frames flow through the mouse input pipeline to two consumer types: the WPF visualizer consumer and the physical Teensy mouse output consumer. The visualizer always receives frames; the physical output consumer only receives frames after foreground receiver gating passes. Poll input on a dedicated background loop, independently from slower UI/status refresh work.
+- Steam Input is the only input emitter. Mouse frames flow through `BridgeRuntime` to the GUI preview every frame and to physical mouse output consumers only after foreground receiver gating passes. Poll input on a dedicated background loop, independently from slower UI/status refresh work.
 - Shared C# protocol library for frame encoding, validation, and the HID input payload.
 - MSTest protocol tests for synthetic input and malformed-frame handling.
 - PlatformIO firmware placeholder for Teensy 4.0.
@@ -133,6 +135,7 @@ Do not implement Steam config editing, Steam VDF rewriting, or automatic Steam l
 ```text
 firmware/
 app/
+app/SteamHidBridge.App/Runtime/
 protocol/
 tests/
 scripts/

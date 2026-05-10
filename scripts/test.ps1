@@ -6,5 +6,11 @@ $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
 $solution = Join-Path $root "SteamHidBridge.slnx"
 
-dotnet test $solution --configuration $Configuration
+dotnet restore $solution
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+dotnet format $solution --verify-no-changes --no-restore
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+dotnet test $solution --configuration $Configuration --no-restore
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
