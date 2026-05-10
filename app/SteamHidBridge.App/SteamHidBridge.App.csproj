@@ -21,6 +21,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="System.IO.Ports" Version="10.*" />
     <ProjectReference Include="..\..\protocol\SteamHidBridge.Protocol\SteamHidBridge.Protocol.csproj" />
   </ItemGroup>
 

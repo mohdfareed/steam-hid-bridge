@@ -1,17 +1,16 @@
 param(
     [string]$Configuration = "Release",
     [string]$Runtime = "win-x64",
-    [switch]$SkipDriver,
-    [switch]$PackageOnly,
+    [switch]$TagRelease,
     [string]$Version = ""
 )
 
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
 
-if ($PackageOnly) {
-    & (Join-Path $root "scripts\internal\package.ps1") -Configuration $Configuration -Runtime $Runtime -Version $Version -SkipDriver:$SkipDriver
+if (!$TagRelease) {
+    & (Join-Path $root "scripts\internal\package.ps1") -Configuration $Configuration -Runtime $Runtime -Version $Version
     exit $LASTEXITCODE
 }
 
-& (Join-Path $root "scripts\internal\deploy.ps1") -Runtime $Runtime -SkipDriver:$SkipDriver
+& (Join-Path $root "scripts\internal\deploy.ps1") -Runtime $Runtime

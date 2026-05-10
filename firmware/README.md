@@ -15,7 +15,20 @@ The firmware is the Teensy-side HID emitter. It should validate host frames, rej
 pio run -d .\firmware
 ```
 
-PlatformIO must be installed separately. Until hardware arrives, this directory contains only a placeholder sketch and PlatformIO configuration.
+PlatformIO must be installed separately.
+`scripts/check.ps1` and `scripts/publish.ps1` also build this firmware. Publish copies the generated hex to:
+
+```text
+artifacts\SteamHidBridge-win-x64\firmware\SteamHidBridge.Teensy40.hex
+```
+
+Upload to the board:
+
+```powershell
+pio run -d .\firmware -t upload
+```
+
+The firmware listens on the Teensy USB serial interface at `115200` baud and emits mouse HID reports for validated bridge frames.
 
 ## Responsibilities
 

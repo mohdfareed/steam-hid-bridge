@@ -1,6 +1,6 @@
 # Windows App
 
-The Windows app is the Steam-launched bridge host. It keeps Steam focused on the bridge shortcut, stores per-game launch metadata, observes Steam's legacy mouse output through Windows Raw Input, and previews normalized output while the Teensy transport is still pending.
+The Windows app is the Steam-launched bridge host. It keeps Steam focused on the bridge shortcut, stores per-game launch metadata, observes Steam input, previews normalized output, and forwards gated mouse frames to the selected output mode.
 
 ## Current Behavior
 
@@ -13,22 +13,18 @@ The Windows app is the Steam-launched bridge host. It keeps Steam focused on the
 - The UI can copy Steam ROM Manager JSON for all profiles. Generated entries target the bridge executable and pass `--profile <id> --launch`.
 - Published builds are self-contained for the selected Windows runtime.
 - User data lives under `%LOCALAPPDATA%\SteamHidBridge`, outside the install folder.
-- The General section stores theme, Steam ROM Manager manifest path, and release update actions.
+- The UI is organized into native WPF tabs for profile editing, general settings, output preview, and diagnostics.
+- The Settings tab stores input mode, output mode, Teensy serial port, Steam ROM Manager manifest path, app data access, driver install status, and release update actions.
 
 ## Folders
 
 ```text
 SteamHidBridge.App/
-  Views/            WPF presentation
-  ViewModels/       WPF binding state and commands
-  Runtime/          process lifetime, foreground gate, Steam forcing, input routing
-  Profiles/         appsettings schema and Steam ROM Manager export
-  Input/            mouse frame model and output consumers
-  Steam/            Steam config forcing notes and helper
-  Windows/          Win32 foreground/process helpers
-  Startup/          command-line parsing
-  Updates/          GitHub Release check and update handoff
-  Infrastructure/   tray icon, logging, commands
+  Ui/               WPF views and binding view models only
+  Core/             input frames, runtime loop, foreground gate, output routing
+  Configuration/    appsettings schema and Steam ROM Manager export
+  Platform/         OS, Steam, tray, logging, startup, and theme adapters
+  Update/           GitHub Release check and update handoff
 ```
 
 ## Profile Schema
@@ -37,6 +33,9 @@ SteamHidBridge.App/
 {
   "general": {
     "theme": "system",
+    "inputMode": "legacyMouse",
+    "outputMode": "teensy",
+    "teensyPort": "auto",
     "srmManifestPath": "%LOCALAPPDATA%\\SteamHidBridge\\srm\\games.json"
   },
   "games": {
@@ -53,6 +52,12 @@ SteamHidBridge.App/
 
 The app stores profiles at `%LOCALAPPDATA%\SteamHidBridge\appsettings.json`.
 
+`inputMode` is currently `legacyMouse` or `steamInputActions`. Legacy mouse is active. Steam Input actions are selectable in settings, but the native action reader still needs the app id/action manifest path repaired before it can emit frames.
+
+`outputMode` is `visualizeOnly`, `teensy`, or `virtualMouseDriver`. The driver mode uses the packaged KMDF/VHF driver device interface when installed. Driver installation is disabled in the UI until the signing/test-mode path is resolved.
+
+`teensyPort` may be a COM port such as `COM7`, or `auto` to try available serial ports.
+
 The General section writes a Steam ROM Manager manifest JSON file for all profiles. By default this is `%LOCALAPPDATA%\SteamHidBridge\srm\games.json`, but the path is configurable in app settings so SRM configuration can live in a separate dotfiles or cloud-synced setup.
 
 ## Steam Notes
@@ -61,4 +66,4 @@ When a configured receiver owns the foreground window, the app requests Steam co
 
 Launch mode keeps the main window hidden behind the tray icon. Do not put Steam layout editing, VDF rewriting, automatic layout import/export, or overlay-host workarounds in v1.
 
-Input currently observes legacy mouse output through Windows Raw Input. See [Steam/README.md](Steam/README.md) for the active Steam integration notes.
+Input currently observes legacy mouse output through Windows Raw Input. See [Platform/Steam/README.md](SteamHidBridge.App/Platform/Steam/README.md) for the active Steam integration notes.

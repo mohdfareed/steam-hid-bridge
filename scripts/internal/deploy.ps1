@@ -1,6 +1,5 @@
 param(
-    [string] $Runtime = "win-x64",
-    [switch] $SkipDriver
+    [string] $Runtime = "win-x64"
 )
 
 $ErrorActionPreference = "Stop"
@@ -101,7 +100,7 @@ if ($remoteTagExitCode -ne 2) {
 Assert-CleanWorkTree
 
 Invoke-Checked "Build" { & (Join-Path $root "scripts\check.ps1") -Configuration Release }
-Invoke-Checked "Package" { & (Join-Path $PSScriptRoot "package.ps1") -Configuration Release -Runtime $Runtime -Version $version -SkipDriver:$SkipDriver }
+Invoke-Checked "Package" { & (Join-Path $PSScriptRoot "package.ps1") -Configuration Release -Runtime $Runtime -Version $version }
 
 Assert-CleanWorkTree
 

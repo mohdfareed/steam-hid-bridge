@@ -1,0 +1,135 @@
+<UserControl x:Class="SteamHidBridge.App.Ui.Views.GeneralSettingsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <ScrollViewer VerticalScrollBarVisibility="Auto"
+                  HorizontalScrollBarVisibility="Auto">
+        <Grid MinWidth="640">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="120" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="132" />
+            </Grid.ColumnDefinitions>
+
+            <TextBlock Text="Theme" VerticalAlignment="Center" />
+            <ComboBox Grid.Column="1"
+                      Grid.ColumnSpan="2"
+                      ItemsSource="{Binding ThemeOptions}"
+                      SelectedItem="{Binding SelectedTheme}"
+                      ToolTip="Choose the app theme." />
+
+            <TextBlock Grid.Row="1"
+                       Text="Input"
+                       Margin="0,8,0,0"
+                       VerticalAlignment="Center" />
+            <ComboBox Grid.Row="1"
+                      Grid.Column="1"
+                      Grid.ColumnSpan="2"
+                      Margin="0,8,0,0"
+                      ItemsSource="{Binding InputModeOptions}"
+                      SelectedItem="{Binding SelectedInputMode}"
+                      ToolTip="Choose legacy mouse observation or native Steam Input actions." />
+
+            <TextBlock Grid.Row="2"
+                       Text="Output"
+                       Margin="0,8,0,0"
+                       VerticalAlignment="Center" />
+            <ComboBox Grid.Row="2"
+                      Grid.Column="1"
+                      Grid.ColumnSpan="2"
+                      Margin="0,8,0,0"
+                      ItemsSource="{Binding OutputModeOptions}"
+                      SelectedItem="{Binding SelectedOutputMode}"
+                      ToolTip="Choose visualization only, Teensy board output, or the virtual mouse driver." />
+
+            <TextBlock Grid.Row="3"
+                       Text="Teensy port"
+                       Margin="0,8,0,0"
+                       VerticalAlignment="Center" />
+            <TextBox Grid.Row="3"
+                     Grid.Column="1"
+                     Grid.ColumnSpan="2"
+                     Margin="0,8,0,0"
+                     Text="{Binding TeensyPort, UpdateSourceTrigger=PropertyChanged}"
+                     ToolTip="COM port for the Teensy, or auto to try available serial ports." />
+
+            <TextBlock Grid.Row="4"
+                       Text="SRM manifest"
+                       Margin="0,8,0,0"
+                       VerticalAlignment="Center" />
+            <TextBox Grid.Row="4"
+                     Grid.Column="1"
+                     Grid.ColumnSpan="2"
+                     Margin="0,8,0,0"
+                     Text="{Binding SrmManifestPath, UpdateSourceTrigger=PropertyChanged}"
+                     ToolTip="Manifest JSON path used by your Steam ROM Manager parser." />
+
+            <TextBlock Grid.Row="5"
+                       Text="App data"
+                       Margin="0,8,0,0"
+                       VerticalAlignment="Center" />
+            <TextBox Grid.Row="5"
+                     Grid.Column="1"
+                     Margin="0,8,8,0"
+                     Text="{Binding AppDataPath, Mode=OneWay}"
+                     IsReadOnly="True"
+                     ToolTip="Folder containing appsettings.json, logs, and generated data." />
+            <Button Grid.Row="5"
+                    Grid.Column="2"
+                    Content="Open"
+                    Margin="0,8,0,0"
+                    Command="{Binding OpenAppDataCommand}"
+                    ToolTip="Open the app data folder." />
+
+            <TextBlock Grid.Row="6"
+                       Text="Virtual driver"
+                       Margin="0,12,0,0"
+                       VerticalAlignment="Center" />
+            <TextBlock Grid.Row="6"
+                       Grid.Column="1"
+                       Text="{Binding DriverInstallText}"
+                       Margin="0,12,8,0"
+                       VerticalAlignment="Center"
+                       TextWrapping="Wrap" />
+            <Button Grid.Row="6"
+                    Grid.Column="2"
+                    Content="Install"
+                    Margin="0,12,0,0"
+                    Command="{Binding InstallDriverCommand}"
+                    ToolTip="Driver install is disabled until signing/test-mode setup is resolved." />
+
+            <TextBlock Grid.Row="7"
+                       Text="Version"
+                       Margin="0,12,0,0"
+                       VerticalAlignment="Center" />
+            <TextBlock Grid.Row="7"
+                       Grid.Column="1"
+                       Text="{Binding VersionText}"
+                       Margin="0,12,8,0"
+                       VerticalAlignment="Center" />
+            <Button Grid.Row="7"
+                    Grid.Column="2"
+                    Content="Check Updates"
+                    Margin="0,12,0,0"
+                    Command="{Binding CheckForUpdateCommand}"
+                    ToolTip="Check GitHub Releases for a newer version." />
+
+            <Button Grid.Row="8"
+                    Grid.Column="2"
+                    Content="Save"
+                    Margin="0,8,0,0"
+                    Command="{Binding SaveGeneralCommand}"
+                    ToolTip="Save general settings and write Steam ROM Manager JSON." />
+        </Grid>
+    </ScrollViewer>
+</UserControl>

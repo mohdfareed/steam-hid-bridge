@@ -3,14 +3,14 @@ using System.IO;
 using System.Linq;
 using System.Windows;
 using System.Windows.Threading;
-using SteamHidBridge.App.Infrastructure;
-using SteamHidBridge.App.Profiles;
-using SteamHidBridge.App.Runtime;
-using SteamHidBridge.App.Startup;
-using SteamHidBridge.App.Updates;
-using SteamHidBridge.App.ViewModels;
-using SteamHidBridge.App.Views;
-using SteamHidBridge.App.Windows;
+using SteamHidBridge.App.Configuration;
+using SteamHidBridge.App.Core.Output;
+using SteamHidBridge.App.Core.Runtime;
+using SteamHidBridge.App.Platform.App;
+using SteamHidBridge.App.Platform.Windows;
+using SteamHidBridge.App.Ui.ViewModels;
+using SteamHidBridge.App.Ui.Views;
+using SteamHidBridge.App.Update;
 
 [assembly: ThemeInfo(ResourceDictionaryLocation.None, ResourceDictionaryLocation.SourceAssembly)]
 
@@ -21,6 +21,7 @@ public partial class App : Application
     private TrayIconHost? trayIconHost;
     private MainWindowViewModel? mainWindowViewModel;
     private BridgeRuntime? bridgeRuntime;
+    private MouseOutputRouter? mouseOutputRouter;
     private ShutdownSignalListener? shutdownSignalListener;
     private RawMouseInputWindowHook? rawMouseInputWindowHook;
     private bool hideMainWindowToTrayOnClose;
@@ -48,11 +49,16 @@ public partial class App : Application
             StartupSync.Run(settingsStore);
             AppThemeManager.Apply(settingsStore.Document.General.Theme);
 
-            bridgeRuntime = new BridgeRuntime(launchOptions, []);
+            mouseOutputRouter = new MouseOutputRouter(settingsStore.Document.General.OutputMode, settingsStore.Document.General.TeensyPort);
+            bridgeRuntime = new BridgeRuntime(launchOptions, [mouseOutputRouter]);
+            bridgeRuntime.SetInputMode(settingsStore.Document.General.InputMode);
             mainWindowViewModel = new MainWindowViewModel(
                 launchOptions,
                 settingsStore,
                 bridgeRuntime,
+                bridgeRuntime.SetInputMode,
+                mouseOutputRouter.SetMode,
+                mouseOutputRouter.SetTeensyPort,
                 AppThemeManager.Apply,
                 ConfirmUpdate,
                 action => Dispatcher.BeginInvoke(action));
@@ -94,6 +100,7 @@ public partial class App : Application
     {
         isExiting = true;
         bridgeRuntime?.Dispose();
+        mouseOutputRouter?.Dispose();
         trayIconHost?.Dispose();
         shutdownSignalListener?.Dispose();
         rawMouseInputWindowHook?.Dispose();

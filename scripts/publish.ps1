@@ -1,8 +1,7 @@
 param(
     [string]$Configuration = "Release",
     [string]$Runtime = "win-x64",
-    [string]$Version = "0.0.0",
-    [switch]$SkipDriver
+    [string]$Version = "0.0.0"
 )
 
 $ErrorActionPreference = "Stop"
@@ -40,19 +39,25 @@ if (-not [string]::IsNullOrWhiteSpace($Version)) {
 dotnet @publishArgs
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-if (-not $SkipDriver) {
-    & (Join-Path $root "scripts\internal\driver-build.ps1") -Configuration $Configuration -Platform x64
+& (Join-Path $root "scripts\internal\driver-build.ps1") -Configuration $Configuration -Platform x64
 
-    $driverSource = Join-Path $root "driver\SteamHidBridge.VirtualMouse\obj\x64\$Configuration"
-    $senderSource = Join-Path $root "driver\SteamHidBridge.VirtualMouse.TestSender\obj\x64\$Configuration"
-    $driverDest = Join-Path $output "driver"
-    New-Item -ItemType Directory -Force -Path $driverDest | Out-Null
+$driverSource = Join-Path $root "driver\SteamHidBridge.VirtualMouse\obj\x64\$Configuration"
+$senderSource = Join-Path $root "driver\SteamHidBridge.VirtualMouse.TestSender\obj\x64\$Configuration"
+$driverDest = Join-Path $output "driver"
+New-Item -ItemType Directory -Force -Path $driverDest | Out-Null
 
-    Copy-Item -LiteralPath (Join-Path $driverSource "SteamHidBridge.VirtualMouse.inf") -Destination $driverDest -Force
-    Copy-Item -LiteralPath (Join-Path $driverSource "SteamHidBridge.VirtualMouse.sys") -Destination $driverDest -Force
-    Copy-Item -LiteralPath (Join-Path $driverSource "steamhidbridge.virtualmouse.cat") -Destination (Join-Path $driverDest "SteamHidBridge.VirtualMouse.cat") -Force
-    Copy-Item -LiteralPath (Join-Path $senderSource "SteamHidBridge.VirtualMouse.TestSender.exe") -Destination $driverDest -Force
-    Copy-Item -LiteralPath (Join-Path $root "scripts\internal\driver-install.ps1") -Destination (Join-Path $driverDest "install.ps1") -Force
-}
+Copy-Item -LiteralPath (Join-Path $driverSource "SteamHidBridge.VirtualMouse.inf") -Destination $driverDest -Force
+Copy-Item -LiteralPath (Join-Path $driverSource "SteamHidBridge.VirtualMouse.sys") -Destination $driverDest -Force
+Copy-Item -LiteralPath (Join-Path $driverSource "steamhidbridge.virtualmouse.cat") -Destination (Join-Path $driverDest "SteamHidBridge.VirtualMouse.cat") -Force
+Copy-Item -LiteralPath (Join-Path $senderSource "SteamHidBridge.VirtualMouse.TestSender.exe") -Destination $driverDest -Force
+Copy-Item -LiteralPath (Join-Path $root "scripts\internal\driver-install.ps1") -Destination (Join-Path $driverDest "install.ps1") -Force
+
+& (Join-Path $root "scripts\internal\firmware-build.ps1") -Environment teensy40
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+$firmwareSource = Join-Path $root "firmware\.pio\build\teensy40\firmware.hex"
+$firmwareDest = Join-Path $output "firmware"
+New-Item -ItemType Directory -Force -Path $firmwareDest | Out-Null
+Copy-Item -LiteralPath $firmwareSource -Destination (Join-Path $firmwareDest "SteamHidBridge.Teensy40.hex") -Force
 
 Write-Host "Published to $output"

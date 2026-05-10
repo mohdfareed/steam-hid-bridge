@@ -14,7 +14,7 @@ Steam Input remains the configuration layer; this project handles profile launch
   * Accurate launch state tracking allows Steam to reliably start and stop games.
   * Foreground gating such that input is only sent when the game is active.
   * Steam Input configurations to reliably activate when the game is active.
-* Forwards mouse events as a virtual HID device, adding Steam Input support to games that only support raw mouse input.
+* Forwards mouse events to a selected output mode: visualization only, Teensy 4.0 USB HID, or the packaged virtual mouse driver.
 * Consistent shortcuts allows for Steam Cloud sync of Steam Input configurations (*undocumented/unreliable*).
 
 ## Install
@@ -47,14 +47,6 @@ dotnet run --project .\app\SteamHidBridge.App -- --profile game-profile
 dotnet run --project .\app\SteamHidBridge.App -- --profile game-profile --launch
 ```
 
-Driver install requires an elevated PowerShell session after publish (can also be installed from within the app):
-
-```powershell
-.\artifacts\SteamHidBridge-win-x64\driver\install.ps1 -EnableTestSigning -Sign
-```
-
-Reboot after enabling test signing.
-
 ## Steam Use
 
 1. Install or publish the Windows app.
@@ -71,10 +63,10 @@ Reboot after enabling test signing.
 ```text
 app/        Windows bridge application
 protocol/   Host-device frame and HID report payloads
-firmware/   Teensy 4.0 placeholder firmware
-driver/     VHF/KMDF virtual HID software-output spike
+firmware/   Teensy 4.0 firmware
+driver/     VHF/KMDF virtual mouse driver package
 tests/      Protocol tests
-scripts/    Build, test, publish, release helpers
+scripts/    Build, check, publish, release, install helpers
 ```
 
 ## Build
@@ -82,22 +74,24 @@ scripts/    Build, test, publish, release helpers
 Prerequisites:
 
 - Latest stable .NET SDK that supports the target framework.
-- PlatformIO CLI for firmware work.
-- Visual Studio with C++ workload for the virtual HID driver.
+- Visual Studio C++ and WDK components for the virtual driver.
+- PlatformIO CLI for firmware build/upload. The VS Code PlatformIO extension works after it has created its local CLI environment.
 
 ```powershell
 .\scripts\check.ps1
 .\scripts\publish.ps1
 ```
 
-`publish.ps1` creates a self-contained single-file Windows app under `artifacts/SteamHidBridge-win-x64` and copies the virtual mouse driver package into `artifacts/SteamHidBridge-win-x64/driver`.
-`release.ps1 -PackageOnly` creates the release zip at `artifacts/SteamHidBridge-win-x64.zip`.
-`release.ps1` without `-PackageOnly` runs the release checks, creates a version tag, and pushes it to trigger the release workflow.
+`check.ps1` verifies formatting, builds the app/protocol projects, runs tests, builds the virtual driver, and builds the Teensy firmware.
+`publish.ps1` creates a self-contained single-file Windows app under `artifacts/SteamHidBridge-win-x64` and includes the driver and firmware artifacts.
+`release.ps1` creates the release zip at `artifacts/SteamHidBridge-win-x64.zip`.
+`release.ps1 -TagRelease` runs the release checks, creates a version tag, and pushes it to trigger the release workflow.
 
-Firmware build, once PlatformIO is installed:
+Firmware build/upload:
 
 ```powershell
 pio run -d .\firmware
+pio run -d .\firmware -t upload
 ```
 
 ## Releases

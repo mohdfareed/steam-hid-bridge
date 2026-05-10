@@ -1,0 +1,116 @@
+<UserControl x:Class="SteamHidBridge.App.Ui.Views.ProfileSettingsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <ScrollViewer VerticalScrollBarVisibility="Auto"
+                  HorizontalScrollBarVisibility="Auto">
+        <Grid MinWidth="640">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="120" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="132" />
+            </Grid.ColumnDefinitions>
+
+            <TextBlock Text="Entry" VerticalAlignment="Center" />
+            <ComboBox Grid.Column="1"
+                      Margin="0,0,8,0"
+                      ItemsSource="{Binding GameIds}"
+                      SelectedItem="{Binding SelectedGameId}"
+                      ToolTip="Select a saved profile." />
+            <Button Grid.Column="2"
+                    Content="New"
+                    Command="{Binding NewGameCommand}"
+                    ToolTip="Create a new profile." />
+
+            <TextBlock Grid.Row="1"
+                       Text="Id *"
+                       Margin="0,8,0,0"
+                       VerticalAlignment="Center" />
+            <TextBox Grid.Row="1"
+                     Grid.Column="1"
+                     Grid.ColumnSpan="2"
+                     Margin="0,8,0,0"
+                     Text="{Binding EditGameId, UpdateSourceTrigger=PropertyChanged}"
+                     ToolTip="Profile id used by --profile." />
+
+            <TextBlock Grid.Row="2"
+                       Text="Title"
+                       Margin="0,8,0,0"
+                       VerticalAlignment="Center" />
+            <TextBox Grid.Row="2"
+                     Grid.Column="1"
+                     Grid.ColumnSpan="2"
+                     Margin="0,8,0,0"
+                     Text="{Binding EditTitle, UpdateSourceTrigger=PropertyChanged}"
+                     ToolTip="Display name for this profile." />
+
+            <TextBlock Grid.Row="3"
+                       Text="Executable *"
+                       Margin="0,8,0,0"
+                       VerticalAlignment="Center" />
+            <TextBox Grid.Row="3"
+                     Grid.Column="1"
+                     Grid.ColumnSpan="2"
+                     Margin="0,8,0,0"
+                     Text="{Binding EditExecutable, UpdateSourceTrigger=PropertyChanged}"
+                     ToolTip="Executable launched by this profile." />
+
+            <TextBlock Grid.Row="4"
+                       Text="Args"
+                       Margin="0,8,0,0"
+                       VerticalAlignment="Center" />
+            <TextBox Grid.Row="4"
+                     Grid.Column="1"
+                     Grid.ColumnSpan="2"
+                     Margin="0,8,0,0"
+                     Text="{Binding EditArguments, UpdateSourceTrigger=PropertyChanged}"
+                     ToolTip="Launch arguments for the executable." />
+
+            <TextBlock Grid.Row="5"
+                       Text="Working dir"
+                       Margin="0,8,0,0"
+                       VerticalAlignment="Center" />
+            <TextBox Grid.Row="5"
+                     Grid.Column="1"
+                     Grid.ColumnSpan="2"
+                     Margin="0,8,0,0"
+                     Text="{Binding EditWorkingDirectory, UpdateSourceTrigger=PropertyChanged}"
+                     ToolTip="Working directory for the launched process." />
+
+            <TextBlock Grid.Row="6"
+                       Text="Receivers *"
+                       Margin="0,8,0,0"
+                       VerticalAlignment="Center" />
+            <TextBox Grid.Row="6"
+                     Grid.Column="1"
+                     Grid.ColumnSpan="2"
+                     Margin="0,8,0,0"
+                     Text="{Binding EditReceiverProcessesText, UpdateSourceTrigger=PropertyChanged}"
+                     ToolTip="Process names that enable forwarding when foreground. Separate multiple receivers with commas, semicolons, or new lines. Example: ExampleGame.exe, ExampleLauncher.exe" />
+
+            <StackPanel Grid.Row="7"
+                        Grid.Column="1"
+                        Grid.ColumnSpan="2"
+                        Orientation="Horizontal"
+                        HorizontalAlignment="Right"
+                        Margin="0,12,0,0">
+                <Button Content="Save"
+                        Margin="0,0,8,0"
+                        Command="{Binding SaveGameCommand}"
+                        ToolTip="Save this profile." />
+                <Button Content="Launch"
+                        Command="{Binding LaunchGameCommand}"
+                        ToolTip="Launch this profile's executable." />
+            </StackPanel>
+        </Grid>
+    </ScrollViewer>
+</UserControl>
