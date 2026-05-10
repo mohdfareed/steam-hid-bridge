@@ -37,3 +37,18 @@ Root\SteamHidBridgeVirtualMouse
 ```
 
 Expect test signing / driver signing friction. Do not include this in the normal app installer until install, uninstall, signing, and anti-cheat implications are understood.
+
+There are two install paths:
+
+- Local development: sign with a local test certificate and enable Windows test mode. Secure Boot blocks local test mode, so this path requires a test machine or VM where Secure Boot is disabled.
+- Secure Boot enabled: use Microsoft Hardware Dev Center signing. Preproduction signing is for provisioned test machines; attestation or WHCP signing is the release-style path.
+
+The packaged installer supports both shapes:
+
+```powershell
+# Local development package.
+.\install.ps1 -EnableTestSigning -Sign
+
+# Microsoft-signed package.
+.\install.ps1 -MicrosoftSigned
+```

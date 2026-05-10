@@ -1,6 +1,7 @@
 param(
     [switch]$EnableTestSigning,
     [switch]$Sign,
+    [switch]$MicrosoftSigned,
     [string]$Configuration = "Debug",
     [string]$Platform = "x64"
 )
@@ -52,6 +53,10 @@ function Enable-TestSigningIfRequested {
 function Invoke-DriverPackageSigning {
     param([string]$CatalogPath)
 
+    if ($MicrosoftSigned) {
+        return
+    }
+
     if (-not $Sign) {
         return
     }
@@ -100,6 +105,14 @@ function Invoke-DriverPackageSigning {
 
 Assert-Admin
 
+if ($MicrosoftSigned -and $Sign) {
+    throw "Use either -MicrosoftSigned or -Sign, not both."
+}
+
+if ($MicrosoftSigned -and $EnableTestSigning) {
+    throw "Use either -MicrosoftSigned or -EnableTestSigning, not both."
+}
+
 $scriptDir = $PSScriptRoot
 $repoRoot = Split-Path -Parent (Split-Path -Parent $scriptDir)
 $packagedInf = Join-Path $scriptDir "SteamHidBridge.VirtualMouse.inf"
@@ -107,7 +120,7 @@ $driverOutput = if (Test-Path -LiteralPath $packagedInf) {
     $scriptDir
 }
 else {
-    Join-Path $repoRoot "driver\obj\SteamHidBridge.VirtualMouse\$Platform\$Configuration"
+    Join-Path $repoRoot "driver\SteamHidBridge.VirtualMouse\obj\$Platform\$Configuration"
 }
 
 $infPath = Join-Path $driverOutput "SteamHidBridge.VirtualMouse.inf"
@@ -115,6 +128,10 @@ $catPath = Join-Path $driverOutput "SteamHidBridge.VirtualMouse.cat"
 
 if (-not (Test-Path -LiteralPath $infPath)) {
     throw "Driver INF not found: $infPath. Build SteamHidBridge.VirtualMouse first."
+}
+
+if ($MicrosoftSigned -and -not (Test-Path -LiteralPath $catPath)) {
+    throw "Driver catalog not found: $catPath. A Microsoft-signed driver package must include the signed CAT file."
 }
 
 Enable-TestSigningIfRequested

@@ -62,7 +62,7 @@ public static partial class VirtualMouseDriverInstaller
         DirectoryInfo? current = new(AppContext.BaseDirectory);
         while (current is not null)
         {
-            string repoPath = Path.Combine(current.FullName, "scripts", "driver", "install.ps1");
+            string repoPath = Path.Combine(current.FullName, "scripts", "internal", "driver-install.ps1");
             if (File.Exists(repoPath))
             {
                 return repoPath;

@@ -25,10 +25,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Include="appsettings.example.json" CopyToOutputDirectory="PreserveNewest" />
-  </ItemGroup>
-
-  <ItemGroup>
     <Resource Include="Assets\SteamHidBridge.ico" />
   </ItemGroup>
 
