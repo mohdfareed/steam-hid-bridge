@@ -23,7 +23,7 @@ public sealed class TrayIconHost : IDisposable
         _ = menu.Items.Add(new Forms.ToolStripMenuItem(instanceText) { Enabled = false });
         _ = menu.Items.Add(new Forms.ToolStripMenuItem("Open", null, (_, _) => ShowWindow()));
         _ = menu.Items.Add(new Forms.ToolStripSeparator());
-        _ = menu.Items.Add(new Forms.ToolStripMenuItem("Exit", null, (_, _) => this.exit()));
+        _ = menu.Items.Add(new Forms.ToolStripMenuItem("Exit", null, (_, _) => RequestExit()));
 
         icon = LoadIcon();
         notifyIcon = new Forms.NotifyIcon
@@ -38,9 +38,19 @@ public sealed class TrayIconHost : IDisposable
 
     public void ShowWindow()
     {
+        if (disposed)
+        {
+            return;
+        }
+
         if (!window.Dispatcher.CheckAccess())
         {
-            window.Dispatcher.Invoke(ShowWindow);
+            _ = window.Dispatcher.BeginInvoke(ShowWindow);
+            return;
+        }
+
+        if (window.Dispatcher.HasShutdownStarted || window.Dispatcher.HasShutdownFinished)
+        {
             return;
         }
 
@@ -64,6 +74,22 @@ public sealed class TrayIconHost : IDisposable
         notifyIcon.Dispose();
         icon.Dispose();
         disposed = true;
+    }
+
+    private void RequestExit()
+    {
+        if (disposed)
+        {
+            return;
+        }
+
+        if (!window.Dispatcher.CheckAccess())
+        {
+            _ = window.Dispatcher.BeginInvoke(RequestExit);
+            return;
+        }
+
+        exit();
     }
 
     private static Drawing.Icon LoadIcon()

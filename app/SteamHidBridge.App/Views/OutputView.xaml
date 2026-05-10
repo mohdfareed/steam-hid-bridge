@@ -14,6 +14,7 @@
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="110" />
@@ -31,6 +32,15 @@
 
                 <TextBlock Grid.Row="3" Text="Loop" Margin="0,8,0,0" />
                 <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding InputLoopText}" FontFamily="Consolas" Margin="0,8,0,0" />
+
+                <TextBlock Grid.Row="4" Text="Steam" Margin="0,8,0,0" />
+                <TextBox Grid.Row="4"
+                         Grid.Column="1"
+                         Text="{Binding SteamInputText, Mode=OneWay}"
+                         IsReadOnly="True"
+                         TextWrapping="Wrap"
+                         Margin="0,8,0,0"
+                         ToolTip="Steam Input API status." />
             </Grid>
         </GroupBox>
 

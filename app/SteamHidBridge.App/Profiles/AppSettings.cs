@@ -73,6 +73,13 @@ public sealed class AppSettingsStore(string path, AppSettings document)
         });
     }
 
+    public void SaveCurrent()
+    {
+        Save(static _ =>
+        {
+        });
+    }
+
     private void Save(Action<AppSettings> update)
     {
         using Mutex mutex = new(false, BuildMutexName(FilePath));

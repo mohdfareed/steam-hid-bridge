@@ -10,6 +10,7 @@ public sealed partial class MainWindowViewModel
         isForwardingActive = status.ForwardingEnabled;
         ForwardingStatus = status.ForwardingText;
         InputLoopText = status.InputLoopText;
+        SteamInputText = status.SteamInputText;
         OnPropertyChanged(nameof(StatusBrush));
     }
 

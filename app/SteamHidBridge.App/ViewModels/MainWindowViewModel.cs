@@ -19,10 +19,13 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private readonly BridgeLaunchOptions launchOptions;
     private readonly AppSettingsStore settingsStore;
     private readonly BridgeRuntime runtime;
+    private readonly SrmManifestWriter srmManifestWriter;
     private readonly AppUpdater appUpdater;
     private readonly Action<AppTheme> applyTheme;
     private readonly Func<AppUpdateCheckResult, bool> confirmUpdate;
     private readonly Action<Action> dispatch;
+    private readonly string appDataPath = AppDataPaths.RootDirectory;
+    private readonly string activeProfileId;
     private string selectedGameId = string.Empty;
     private string editGameId = string.Empty;
     private string editTitle = string.Empty;
@@ -31,6 +34,10 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private string editWorkingDirectory = string.Empty;
     private string editReceiverProcessesText = string.Empty;
     private string srmManifestPath = string.Empty;
+    private string savedGameId = string.Empty;
+    private GameProfile savedProfile = new();
+    private string savedSrmManifestPath = string.Empty;
+    private AppTheme savedTheme;
     private AppTheme selectedTheme;
     private bool isReloadingGameIds;
     private bool isForwardingActive;
@@ -38,6 +45,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private HidInputReport lastReport;
     private readonly AsyncRelayCommand saveGameCommand;
     private readonly AsyncRelayCommand launchGameCommand;
+    private readonly AsyncRelayCommand saveGeneralCommand;
 
     public MainWindowViewModel(
         BridgeLaunchOptions launchOptions,
@@ -50,25 +58,28 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         this.launchOptions = launchOptions;
         this.settingsStore = settingsStore;
         this.runtime = runtime;
+        srmManifestWriter = new SrmManifestWriter(settingsStore);
         this.applyTheme = applyTheme;
         this.confirmUpdate = confirmUpdate;
         this.dispatch = dispatch;
+        activeProfileId = launchOptions.ProfileId.Trim();
         appUpdater = new AppUpdater();
         runtime.MouseInput += frame => dispatch(() => PreviewMouseInput(frame));
         runtime.StatusChanged += status => dispatch(() => ApplyRuntimeStatus(status));
         runtime.ActivityChanged += (message, isError) => dispatch(() => ApplyActivityMessage(message, isError));
-        runtime.ExitRequested += RequestExit;
+        runtime.ExitRequested += exitCode => dispatch(() => RequestExit(exitCode));
 
         NewGameCommand = new AsyncRelayCommand(NewGameAsync);
-        saveGameCommand = new AsyncRelayCommand(SaveGameAsync, CanSaveOrLaunchProfile);
+        saveGameCommand = new AsyncRelayCommand(SaveGameAsync, CanSaveProfile);
         launchGameCommand = new AsyncRelayCommand(LaunchGameAsync, CanSaveOrLaunchProfile);
+        saveGeneralCommand = new AsyncRelayCommand(SaveGeneralAsync, HasGeneralChanges);
         SaveGameCommand = saveGameCommand;
         LaunchGameCommand = launchGameCommand;
-        SaveGeneralCommand = new AsyncRelayCommand(SaveGeneralAsync);
+        SaveGeneralCommand = saveGeneralCommand;
         CheckForUpdateCommand = new AsyncRelayCommand(CheckForUpdateAsync);
+        OpenAppDataCommand = new AsyncRelayCommand(OpenAppDataAsync);
 
         ReloadGameIds(launchOptions.ProfileId);
-        WriteSrmManifestOnStartup();
         SetActivity($"Ready. profile={selectedGameId}");
         AppLog.Write($"settings={settingsStore.FilePath}");
 
@@ -92,6 +103,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     public ICommand LaunchGameCommand { get; }
     public ICommand SaveGeneralCommand { get; }
     public ICommand CheckForUpdateCommand { get; }
+    public ICommand OpenAppDataCommand { get; }
 
     public string SelectedGameId
     {
@@ -147,6 +159,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
             if (SetProperty(ref editTitle, value))
             {
                 OnPropertyChanged(nameof(ProfileText));
+                RaiseProfileCommandStateChanged();
             }
         }
     }
@@ -154,13 +167,25 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     public string EditArguments
     {
         get => editArguments;
-        set => SetProperty(ref editArguments, value);
+        set
+        {
+            if (SetProperty(ref editArguments, value))
+            {
+                RaiseProfileCommandStateChanged();
+            }
+        }
     }
 
     public string EditWorkingDirectory
     {
         get => editWorkingDirectory;
-        set => SetProperty(ref editWorkingDirectory, value);
+        set
+        {
+            if (SetProperty(ref editWorkingDirectory, value))
+            {
+                RaiseProfileCommandStateChanged();
+            }
+        }
     }
 
     public string EditReceiverProcessesText
@@ -179,11 +204,18 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
 
     public string ProfileText => string.IsNullOrWhiteSpace(EditTitle) ? EditGameId : EditTitle;
     public string ReceiverProcessesText => ReceiverProcesses.Length == 0 ? "None configured" : string.Join(", ", ReceiverProcesses);
+    public string AppDataPath => appDataPath;
 
     public string SrmManifestPath
     {
         get => srmManifestPath;
-        set => SetProperty(ref srmManifestPath, value);
+        set
+        {
+            if (SetProperty(ref srmManifestPath, value))
+            {
+                saveGeneralCommand.RaiseCanExecuteChanged();
+            }
+        }
     }
 
     public AppTheme SelectedTheme
@@ -194,6 +226,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
             if (SetProperty(ref selectedTheme, value))
             {
                 applyTheme(value);
+                saveGeneralCommand.RaiseCanExecuteChanged();
             }
         }
     }
@@ -216,6 +249,12 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         private set => SetProperty(ref field, value);
     } = "input loop starting";
 
+    public string SteamInputText
+    {
+        get;
+        private set => SetProperty(ref field, value);
+    } = "Steam Input not initialized.";
+
     public string ActivityText
     {
         get;
@@ -233,11 +272,12 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     public string StatusBrush => isForwardingActive ? "SeaGreen" : "Gray";
     public bool ActivityIsError => isActivityError;
     public string VersionText => appUpdater.CurrentVersionText;
-    public string ProfileInstanceText => selectedGameId;
-    public string ProcessText => $"{selectedGameId} - PID {Environment.ProcessId}";
-    public string WindowTitle => string.IsNullOrWhiteSpace(selectedGameId)
+    public string ActiveProfileText => string.IsNullOrWhiteSpace(activeProfileId) ? "No active profile" : $"Active profile: {activeProfileId}";
+    public string TrayText => string.IsNullOrWhiteSpace(activeProfileId) ? "No profile" : $"Profile: {activeProfileId}";
+    public string ProcessText => $"{ActiveProfileText} - PID {Environment.ProcessId}";
+    public string WindowTitle => string.IsNullOrWhiteSpace(activeProfileId)
         ? "Steam HID Bridge"
-        : $"Steam HID Bridge - {selectedGameId}";
+        : $"Steam HID Bridge - {activeProfileId}";
 
     private string[] ReceiverProcesses => ParseReceiverProcesses(EditReceiverProcessesText);
 
@@ -264,6 +304,23 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         return !string.IsNullOrWhiteSpace(EditGameId)
             && !string.IsNullOrWhiteSpace(EditExecutable)
             && ReceiverProcesses.Length > 0;
+    }
+
+    private bool CanSaveProfile()
+    {
+        return CanSaveOrLaunchProfile() && HasProfileChanges();
+    }
+
+    private bool HasProfileChanges()
+    {
+        return !string.Equals(savedGameId, EditGameId.Trim(), StringComparison.Ordinal)
+            || !ProfileEquals(savedProfile, ReadEditorProfile());
+    }
+
+    private bool HasGeneralChanges()
+    {
+        return savedTheme != SelectedTheme
+            || !string.Equals(savedSrmManifestPath, SrmManifestPath.Trim(), StringComparison.Ordinal);
     }
 
     private void RaiseProfileCommandStateChanged()

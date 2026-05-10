@@ -4,9 +4,9 @@ using SteamHidBridge.App.Windows;
 
 namespace SteamHidBridge.App.Runtime;
 
-public sealed class ForwardingGate(ulong? steamAppId, Action<string, bool> setActivity) : IDisposable
+public sealed class ForwardingGate(Action<string, bool> setActivity) : IDisposable
 {
-    private readonly SteamInputConfigForcer steamInputConfigForcer = new(steamAppId);
+    private readonly SteamInputConfigForcer steamInputConfigForcer = new();
     private bool hasSeenReceiverProcess;
 
     public bool IsForwarding { get; private set; }

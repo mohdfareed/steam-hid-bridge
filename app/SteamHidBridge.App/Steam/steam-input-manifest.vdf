@@ -1,16 +1,31 @@
-"In Game Actions"
+"Action Manifest"
 {
+    "configurations"
+    {
+        "controller_steamcontroller_gordon"
+        {
+        }
+
+        "controller_neptune"
+        {
+        }
+
+        "controller_generic"
+        {
+        }
+    }
+
     "actions"
     {
-        "bridge"
+        "mouse"
         {
-            "title" "#Set_Bridge"
+            "title" "#Set_Mouse"
 
             "StickPadGyro"
             {
-                "pointer"
+                "mouse_move"
                 {
-                    "title" "#Action_Pointer"
+                    "title" "#Action_MouseMove"
                     "input_mode" "absolute_mouse"
                 }
             }
@@ -36,13 +51,13 @@
     {
         "english"
         {
-            "Set_Bridge" "Bridge"
-            "Action_Pointer" "Pointer"
-            "Action_MouseLeft" "Mouse Left"
-            "Action_MouseRight" "Mouse Right"
-            "Action_MouseMiddle" "Mouse Middle"
-            "Action_MouseBack" "Mouse Back"
-            "Action_MouseForward" "Mouse Forward"
+            "Set_Mouse" "Mouse"
+            "Action_MouseMove" "Move Pointer"
+            "Action_MouseLeft" "Left Click"
+            "Action_MouseRight" "Right Click"
+            "Action_MouseMiddle" "Middle Click"
+            "Action_MouseBack" "Back"
+            "Action_MouseForward" "Forward"
             "Action_WheelUp" "Wheel Up"
             "Action_WheelDown" "Wheel Down"
         }

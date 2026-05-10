@@ -58,8 +58,8 @@ User data is stored outside the install folder:
 Run the app directly:
 
 ```powershell
-dotnet run --project .\app\SteamHidBridge.App -- --profile valorant
-dotnet run --project .\app\SteamHidBridge.App -- --profile valorant --launch
+dotnet run --project .\app\SteamHidBridge.App -- --profile game-profile
+dotnet run --project .\app\SteamHidBridge.App -- --profile game-profile --launch
 ```
 
 Firmware build, once PlatformIO is installed:

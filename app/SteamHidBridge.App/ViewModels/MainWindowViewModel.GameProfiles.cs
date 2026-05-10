@@ -49,7 +49,11 @@ public sealed partial class MainWindowViewModel
             ReloadGameIds(newId);
         }
 
-        SetActivity($"Saved {newId}.");
+        if (WriteSrmManifest())
+        {
+            SetActivity($"Saved {newId} and wrote Steam ROM Manager manifest.");
+        }
+
         return Task.CompletedTask;
     }
 
@@ -63,53 +67,45 @@ public sealed partial class MainWindowViewModel
     private Task SaveGeneralAsync()
     {
         settingsStore.SaveGeneral(SelectedTheme, SrmManifestPath);
-        return WriteSrmManifestAsync(showSuccess: true);
-    }
-
-    private Task WriteSrmManifestOnStartup()
-    {
-        return WriteSrmManifestAsync(showSuccess: false);
-    }
-
-    private Task WriteSrmManifestAsync(bool showSuccess)
-    {
-        string executable = Environment.ProcessPath ?? string.Empty;
-        if (string.IsNullOrWhiteSpace(executable))
+        savedTheme = settingsStore.Document.General.Theme;
+        savedSrmManifestPath = settingsStore.Document.General.SrmManifestPath;
+        saveGeneralCommand.RaiseCanExecuteChanged();
+        if (WriteSrmManifest())
         {
-            SetError("Could not find bridge executable path.");
-            return Task.CompletedTask;
+            SetActivity($"Saved general settings and wrote Steam ROM Manager manifest for {settingsStore.Document.Games.Count} profile(s).");
         }
 
-        string json = SteamRomManagerExport.CreateJson(settingsStore.Document.Games, executable);
-        string manifestPath = ExpandPath(SrmManifestPath);
-        if (string.IsNullOrWhiteSpace(manifestPath))
-        {
-            SetError("Steam ROM Manager manifest path is empty.");
-            return Task.CompletedTask;
-        }
+        return Task.CompletedTask;
+    }
 
+    private Task OpenAppDataAsync()
+    {
         try
         {
-            string? directory = Path.GetDirectoryName(manifestPath);
-            if (!string.IsNullOrWhiteSpace(directory))
-            {
-                _ = Directory.CreateDirectory(directory);
-            }
-            File.WriteAllText(manifestPath, json);
+            AppDataFolder.Open();
+            SetActivity($"Opened {AppDataPaths.RootDirectory}.");
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            SetError($"Could not open app data folder: {ex.Message}");
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private bool WriteSrmManifest()
+    {
+        try
+        {
+            SrmManifestWriteResult result = srmManifestWriter.Write(SrmManifestPath, Environment.ProcessPath);
+            AppLog.Write($"srm manifest written path={result.Path} profiles={result.ProfileCount}");
+            return true;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException or InvalidOperationException)
         {
             SetError($"Could not write Steam ROM Manager manifest: {ex.Message}");
-            return Task.CompletedTask;
+            return false;
         }
-
-        AppLog.Write($"srm manifest written path={manifestPath} profiles={settingsStore.Document.Games.Count}");
-        if (showSuccess)
-        {
-            SetActivity($"Saved general settings and wrote manifest for {settingsStore.Document.Games.Count} profile(s).");
-        }
-
-        return Task.CompletedTask;
     }
 
     private void ReloadGameIds(string requestedId)
@@ -206,6 +202,10 @@ public sealed partial class MainWindowViewModel
         editReceiverProcessesText = string.Join(", ", profile.ReceiverProcesses);
         srmManifestPath = settingsStore.Document.General.SrmManifestPath;
         selectedTheme = settingsStore.Document.General.Theme;
+        savedGameId = gameId;
+        savedProfile = CloneProfile(profile);
+        savedSrmManifestPath = srmManifestPath;
+        savedTheme = selectedTheme;
         runtime.SetProfile(gameId, profile);
 
         OnPropertyChanged(nameof(SelectedGameId));
@@ -219,10 +219,8 @@ public sealed partial class MainWindowViewModel
         OnPropertyChanged(nameof(SelectedTheme));
         OnPropertyChanged(nameof(ProfileText));
         OnPropertyChanged(nameof(ReceiverProcessesText));
-        OnPropertyChanged(nameof(ProfileInstanceText));
-        OnPropertyChanged(nameof(ProcessText));
-        OnPropertyChanged(nameof(WindowTitle));
         RaiseProfileCommandStateChanged();
+        saveGeneralCommand.RaiseCanExecuteChanged();
     }
 
     private GameProfile ReadEditorProfile()
@@ -254,15 +252,24 @@ public sealed partial class MainWindowViewModel
         return $"{prefix}-{suffix}";
     }
 
-    private static string ExpandPath(string path)
+    private static GameProfile CloneProfile(GameProfile profile)
     {
-        path = Environment.ExpandEnvironmentVariables(path.Trim());
-        if (path.StartsWith(@"~\", StringComparison.Ordinal) || path.StartsWith("~/", StringComparison.Ordinal))
+        return new GameProfile
         {
-            string home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-            path = Path.Combine(home, path[2..]);
-        }
+            Title = profile.Title,
+            Executable = profile.Executable,
+            Arguments = profile.Arguments,
+            WorkingDirectory = profile.WorkingDirectory,
+            ReceiverProcesses = [.. profile.ReceiverProcesses]
+        };
+    }
 
-        return path;
+    private static bool ProfileEquals(GameProfile left, GameProfile right)
+    {
+        return string.Equals(left.Title, right.Title, StringComparison.Ordinal)
+            && string.Equals(left.Executable, right.Executable, StringComparison.Ordinal)
+            && string.Equals(left.Arguments, right.Arguments, StringComparison.Ordinal)
+            && string.Equals(left.WorkingDirectory, right.WorkingDirectory, StringComparison.Ordinal)
+            && left.ReceiverProcesses.SequenceEqual(right.ReceiverProcesses, StringComparer.Ordinal);
     }
 }

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using SteamHidBridge.App.Infrastructure;
@@ -7,6 +8,7 @@ using SteamHidBridge.App.Input;
 using SteamHidBridge.App.Profiles;
 using SteamHidBridge.App.Startup;
 using SteamHidBridge.App.Steam;
+using SteamHidBridge.App.Windows;
 
 namespace SteamHidBridge.App.Runtime;
 
@@ -24,12 +26,13 @@ public sealed class BridgeRuntime : IDisposable
     private string profileId = "";
     private GameProfile profile = new();
     private bool isDisposed;
+    private bool hasRequestedExit;
 
     public BridgeRuntime(BridgeLaunchOptions launchOptions, IEnumerable<IMouseInputConsumer> forwardingConsumers)
     {
         this.launchOptions = launchOptions;
         gameProcessHost = new GameProcessHost(SetActivity);
-        forwardingGate = new ForwardingGate(launchOptions.SteamAppId, SetActivity);
+        forwardingGate = new ForwardingGate(SetActivity);
         mouseInputLoop = new MouseInputLoop(steamMouseInputEmitter, OnMouseInput, forwardingConsumers, () => forwardingGate.IsForwarding);
         statusTask = Task.Run(RunStatusLoopAsync);
     }
@@ -77,11 +80,16 @@ public sealed class BridgeRuntime : IDisposable
         {
             statusTask.Wait(TimeSpan.FromSeconds(1));
         }
-        catch (AggregateException ex) when (ex.InnerException is OperationCanceledException)
+        catch (AggregateException ex) when (ex.InnerExceptions.All(static exception => exception is OperationCanceledException))
         {
+        }
+        catch (AggregateException ex)
+        {
+            AppLog.WriteException("status-loop-dispose-failed", ex);
         }
 
         gameProcessHost.Dispose();
+        StopReceiverProcesses();
         forwardingGate.Dispose();
         mouseInputLoop.Dispose();
         cancellation.Dispose();
@@ -138,7 +146,11 @@ public sealed class BridgeRuntime : IDisposable
             ? "input loop starting"
             : $"poll {statistics.PollsPerSecond:F0}/s, frames {statistics.FramesPerSecond:F0}/s";
 
-        StatusChanged?.Invoke(new BridgeRuntimeStatus(forwardingGate.IsForwarding, forwardingText, inputLoopText));
+        StatusChanged?.Invoke(new BridgeRuntimeStatus(
+            forwardingGate.IsForwarding,
+            forwardingText,
+            inputLoopText,
+            steamMouseInputEmitter.StatusText));
     }
 
     private void SetActivity(string value, bool isError = false)
@@ -156,8 +168,34 @@ public sealed class BridgeRuntime : IDisposable
 
     private void RequestExit(string reason)
     {
+        if (hasRequestedExit)
+        {
+            return;
+        }
+
+        hasRequestedExit = true;
         SetActivity(reason, isError: true);
         ExitRequested?.Invoke(0);
+    }
+
+    private void StopReceiverProcesses()
+    {
+        string[] receivers;
+        lock (syncLock)
+        {
+            receivers = [.. profile.ReceiverProcesses];
+        }
+
+        if (receivers.Length == 0)
+        {
+            return;
+        }
+
+        int stoppedCount = WindowsRuntime.StopProcessesByName(receivers);
+        if (stoppedCount > 0)
+        {
+            AppLog.Write($"stopped receiver processes count={stoppedCount}");
+        }
     }
 
     private void OnMouseInput(MouseInputFrame frame)

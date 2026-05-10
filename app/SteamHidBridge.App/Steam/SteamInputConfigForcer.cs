@@ -5,11 +5,11 @@ using System.Globalization;
 
 namespace SteamHidBridge.App.Steam;
 
-public sealed class SteamInputConfigForcer(ulong? configuredAppId)
+public sealed class SteamInputConfigForcer
 {
     private ulong? requestedAppId;
 
-    public ulong? AppId { get; } = configuredAppId ?? DetectAppId();
+    public ulong? AppId { get; } = DetectAppId();
 
     public string StatusText => AppId is ulong appId
         ? $"Steam config force available for appid {appId}"

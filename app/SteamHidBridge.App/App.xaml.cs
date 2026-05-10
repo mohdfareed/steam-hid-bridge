@@ -40,10 +40,11 @@ public partial class App : Application
 
             BridgeLaunchOptions launchOptions = BridgeLaunchOptions.Parse(e.Args);
             hideMainWindowToTrayOnClose = launchOptions.LaunchGame;
-            AppLog.Write($"launch-options profile={launchOptions.ProfileId} launchGame={launchOptions.LaunchGame} steamAppId={launchOptions.SteamAppId}");
+            AppLog.Write($"launch-options profile={launchOptions.ProfileId} launchGame={launchOptions.LaunchGame}");
 
             AppSettingsStore settingsStore = AppSettingsStore.LoadDefault();
             AppLog.Write($"settings loaded path={settingsStore.FilePath}");
+            StartupSync.Run(settingsStore);
             AppThemeManager.Apply(settingsStore.Document.General.Theme);
 
             bridgeRuntime = new BridgeRuntime(launchOptions, []);
@@ -66,7 +67,7 @@ public partial class App : Application
             window.Closed += (_, _) => AppLog.Write("main-window closed");
             MainWindow = window;
 
-            trayIconHost = new TrayIconHost(window, mainWindowViewModel.ProfileInstanceText, () => ExitApplication(0));
+            trayIconHost = new TrayIconHost(window, mainWindowViewModel.TrayText, () => ExitApplication(0));
             if (launchOptions.LaunchGame)
             {
                 overlayHostWindow = new SteamOverlayHostWindow();
@@ -122,16 +123,31 @@ public partial class App : Application
 
     private void ExitApplication(int exitCode)
     {
+        if (!Dispatcher.CheckAccess())
+        {
+            _ = Dispatcher.BeginInvoke(() => ExitApplication(exitCode));
+            return;
+        }
+
+        if (isExiting)
+        {
+            return;
+        }
+
         isExiting = true;
         Shutdown(exitCode);
     }
 
-    private static void OnDispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)
+    private void OnDispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)
     {
         AppLog.Write("dispatcher-unhandled-exception");
-        ShowStartupError(e.Exception);
+        AppLog.WriteException("dispatcher-unhandled-exception", e.Exception);
         e.Handled = true;
-        Current.Shutdown(1);
+        if (!isExiting)
+        {
+            ShowStartupError(e.Exception);
+            ExitApplication(1);
+        }
     }
 
     private static void OnUnhandledException(object sender, UnhandledExceptionEventArgs e)

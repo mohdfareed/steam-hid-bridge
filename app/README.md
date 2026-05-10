@@ -40,12 +40,12 @@ SteamHidBridge.App/
     "srmManifestPath": "%LOCALAPPDATA%\\SteamHidBridge\\srm\\games.json"
   },
   "games": {
-    "valorant": {
-      "title": "Valorant",
-      "executable": "C:\\Riot Games\\Riot Client\\RiotClientServices.exe",
-      "arguments": "--launch-product=valorant --launch-patchline=live",
-      "workingDirectory": "C:\\Riot Games\\Riot Client",
-      "receiverProcesses": [ "VALORANT-Win64-Shipping.exe" ]
+    "game-profile": {
+      "title": "Game Profile",
+      "executable": "C:\\Games\\Example\\ExampleLauncher.exe",
+      "arguments": "--launch-example",
+      "workingDirectory": "C:\\Games\\Example",
+      "receiverProcesses": [ "ExampleGame.exe" ]
     }
   }
 }
@@ -57,8 +57,8 @@ The General section writes a Steam ROM Manager manifest JSON file for all profil
 
 ## Steam Notes
 
-When a configured receiver owns the foreground window, the app requests Steam config forcing with `steam://forceinputappid/<appid>`. It resets with `steam://forceinputappid/0` when foreground is lost or the bridge exits. Steam normally provides the app id in the launch environment; `--steam-app-id <id>` is available as a fallback.
+When a configured receiver owns the foreground window, the app requests Steam config forcing with `steam://forceinputappid/<appid>`. It resets with `steam://forceinputappid/0` when foreground is lost or the bridge exits. Steam normally provides the app id in the launch environment.
 
 The transparent overlay host window exists only in `--launch` mode so Steam has a bridge-owned window while the target game is foreground. Do not put Steam layout editing, VDF rewriting, or automatic layout import/export in v1.
 
-Steam Input currently reads only mouse actions. See [Steam/README.md](Steam/README.md) for the action names and in-game actions file.
+Steam Input currently reads only mouse actions. See [Steam/README.md](Steam/README.md) for the action manifest and action names.

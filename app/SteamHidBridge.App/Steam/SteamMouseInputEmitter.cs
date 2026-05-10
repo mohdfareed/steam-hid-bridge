@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using SteamHidBridge.App.Infrastructure;
 using SteamHidBridge.App.Input;
 using SteamHidBridge.Protocol;
@@ -8,8 +9,9 @@ namespace SteamHidBridge.App.Steam;
 
 public sealed class SteamMouseInputEmitter
 {
-    private const string ActionSetName = "bridge";
-    private const string PointerActionName = "pointer";
+    private const string ManifestFileName = "steam-input-manifest.vdf";
+    private const string ActionSetName = "mouse";
+    private const string PointerActionName = "mouse_move";
     private const string LeftButtonActionName = "mouse_left";
     private const string RightButtonActionName = "mouse_right";
     private const string MiddleButtonActionName = "mouse_middle";
@@ -69,7 +71,7 @@ public sealed class SteamMouseInputEmitter
 
             if (pointer.bActive == 0 && buttons == MouseButtons.None && wheel == 0)
             {
-                StatusText = $"Steam Input initialized; {controllerCount} controller(s) connected.";
+                StatusText = $"Steam Input ready; {controllerCount} controller(s); bridge actions inactive or unbound.";
                 frame = default;
                 return false;
             }
@@ -119,10 +121,12 @@ public sealed class SteamMouseInputEmitter
         {
             if (!SteamAPI.Init())
             {
-                StatusText = "SteamAPI.Init returned false. Launch from Steam, or provide a valid steam_appid.txt for local testing.";
+                StatusText = "SteamAPI.Init returned false. Confirm the bridge was launched by Steam; non-Steam shortcuts may not provide a native Steamworks app context.";
                 AppLog.Write(StatusText);
                 return;
             }
+
+            SetActionManifestPath();
 
             if (!SteamInput.Init(true))
             {
@@ -150,6 +154,25 @@ public sealed class SteamMouseInputEmitter
         {
             StatusText = $"Steam Input unavailable: {ex.Message}";
             AppLog.WriteException("steam-input-init-failed", ex);
+        }
+    }
+
+    private static void SetActionManifestPath()
+    {
+        string manifestPath = Path.Combine(AppContext.BaseDirectory, ManifestFileName);
+        if (!File.Exists(manifestPath))
+        {
+            AppLog.Write($"steam-input manifest missing path={manifestPath}");
+            return;
+        }
+
+        if (SteamInput.SetInputActionManifestFilePath(manifestPath))
+        {
+            AppLog.Write($"steam-input manifest path={manifestPath}");
+        }
+        else
+        {
+            AppLog.Write($"steam-input manifest rejected path={manifestPath}");
         }
     }
 
