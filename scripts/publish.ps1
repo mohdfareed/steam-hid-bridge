@@ -17,6 +17,15 @@ if (Test-Path $output) {
     Remove-Item -LiteralPath $output -Recurse -Force
 }
 
+$restoreArgs = @(
+    "restore",
+    "$root\app\SteamHidBridge.App\SteamHidBridge.App.csproj",
+    "--runtime", $Runtime
+)
+
+dotnet @restoreArgs
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
 $publishArgs = @(
     "publish",
     "$root\app\SteamHidBridge.App\SteamHidBridge.App.csproj",

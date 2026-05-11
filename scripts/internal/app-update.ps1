@@ -11,10 +11,13 @@ param(
     [string] $InstallDir,
 
     [Parameter(Mandatory = $true)]
-    [int] $CurrentProcessId
+    [int] $CurrentProcessId,
+
+    [string] $LogPath = ""
 )
 
 $ErrorActionPreference = "Stop"
+$transcribing = $false
 
 $processName = "SteamHidBridge"
 $assetName = "SteamHidBridge-win-x64.zip"
@@ -47,6 +50,12 @@ function Wait-ForBridgeExit {
 New-Item -ItemType Directory -Path $tempRoot -Force | Out-Null
 
 try {
+    if ($LogPath) {
+        New-Item -ItemType Directory -Path ([IO.Path]::GetDirectoryName($LogPath)) -Force | Out-Null
+        Start-Transcript -Path $LogPath -Force | Out-Null
+        $transcribing = $true
+    }
+
     Write-Host "Downloading $PackageUrl"
     Invoke-WebRequest -Uri $PackageUrl -OutFile $zipPath
 
@@ -71,6 +80,10 @@ try {
     Write-Host "Steam HID Bridge updated."
 }
 finally {
+    if ($transcribing) {
+        Stop-Transcript | Out-Null
+    }
+
     if (Test-Path -LiteralPath $tempRoot) {
         Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
     }

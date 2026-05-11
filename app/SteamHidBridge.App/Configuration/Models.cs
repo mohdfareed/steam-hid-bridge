@@ -10,12 +10,6 @@ internal enum AppTheme
     Dark
 }
 
-internal enum BridgeInputMode
-{
-    LegacyMouse,
-    SteamInputActions
-}
-
 internal enum BridgeOutputMode
 {
     None,
@@ -28,7 +22,6 @@ internal sealed class GameProfile
     public string Executable { get; set; } = string.Empty;
     public string Arguments { get; set; } = string.Empty;
     public string WorkingDirectory { get; set; } = string.Empty;
-    public BridgeInputMode InputMode { get; set; } = BridgeInputMode.LegacyMouse;
     public BridgeOutputMode OutputMode { get; set; } = BridgeOutputMode.Board;
     public List<string> ReceiverProcesses { get; set; } = [];
 
@@ -40,7 +33,6 @@ internal sealed class GameProfile
             Executable = Executable,
             Arguments = Arguments,
             WorkingDirectory = WorkingDirectory,
-            InputMode = InputMode,
             OutputMode = OutputMode,
             ReceiverProcesses = [.. ReceiverProcesses]
         };
@@ -52,7 +44,6 @@ internal sealed class GameProfile
             && Executable == other.Executable
             && Arguments == other.Arguments
             && WorkingDirectory == other.WorkingDirectory
-            && InputMode == other.InputMode
             && OutputMode == other.OutputMode
             && ReceiverProcesses.SequenceEqual(other.ReceiverProcesses);
     }

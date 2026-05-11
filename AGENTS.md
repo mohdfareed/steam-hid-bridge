@@ -71,7 +71,7 @@ Keep diagnostics separate from the hot path.
 
 Keep business logic decoupled from WPF views. UI should bind to view models and services; protocol, transport, validation, startup behavior, and HID mapping logic must remain testable without constructing WPF controls. The WPF UI should be replaceable later without rewriting app logic. Use native WPF controls and built-in Fluent theme support before custom styling.
 
-The Windows app runtime belongs outside WPF views and view models. `Core/Runtime/` owns process lifetime, foreground gating, Steam config forcing, and input routing. View models should only expose editable state and commands for WPF binding.
+The Windows app runtime belongs outside WPF views and view models. `Core/` owns per-instance bridge session behavior such as process lifetime, foreground gating, Steam config forcing, and output routing. `Platform/App/BridgeAppService.cs` owns app-level actions such as settings persistence, SRM export, updater launch, and firmware update start. View models should only expose editable state and commands for WPF binding.
 
 Do not add abstractions, settings, modes, services, or configuration switches unless they are required by the MVP or the user explicitly asks for them. When a use case is unclear, ask before implementing.
 
@@ -82,9 +82,7 @@ Multiple bridge instances are supported. Each Steam shortcut may launch its own 
 The profile model must distinguish:
 
 - Steam shortcut/profile: the Steam-side configuration selected by launching a specific Steam shortcut.
-- Game profile: app-side metadata stored in `%LOCALAPPDATA%\SteamHidBridge\appsettings.json`, keyed by id, with executable, arguments, working directory, and receiver process names.
-- Game profile also owns input mode and output mode. These are not app-wide settings.
-- Steam Input action sets: in-profile modes such as gameplay, menu, buy menu, or shop; do not repurpose these as separate games.
+- Game profile: app-side metadata stored in `%LOCALAPPDATA%\SteamHidBridge\appsettings.json`, keyed by id, with executable, arguments, working directory, receiver process names, and output mode.
 
 Use current official documentation for platform APIs, libraries, and tooling.
 
@@ -103,16 +101,15 @@ The .NET solution root lives under `app/`. Keep `app/SteamHidBridge.slnx` and `a
 - Steam ROM Manager export should generate bridge-targeted shortcuts, not game-targeted shortcuts. Each generated entry should launch the bridge with `--profile <id>`; the selected profile then launches the configured game executable.
 - General app settings live under the `general` JSON object. It contains `theme` (`system`, `light`, or `dark`), `boardPort`, and `srmManifestPath`, which defaults under `%LOCALAPPDATA%\SteamHidBridge\srm\games.json`. Theme selection must use WPF's built-in Fluent `ThemeMode` API, not custom control templates. Do not mutate SRM's own parser configuration unless explicitly requested.
 - Do not inject a synthetic `default` profile. If no profile is requested, select an existing profile; create a local `new-game` entry only when there are no profiles loaded.
-- Publish output should be self-contained single-file for the selected Windows runtime unless the user asks for framework-dependent deployment. Publish always includes the app, `Firmware`, and `Steam` artifacts. The GUI decides which output systems are active.
+- Publish output should be self-contained single-file for the selected Windows runtime unless the user asks for framework-dependent deployment. Publish always includes the app and `Firmware` artifacts. The GUI decides which output systems are active.
 - Release tags use `vMAJOR.MINOR.PATCH`, for example `v0.1.1`. Tag pushes matching that shape build, test, package, and create a GitHub Release with `SteamHidBridge-win-x64.zip`.
 - The installer script lives at `scripts/install.ps1`, downloads from GitHub Releases, replaces the install folder, and creates a Desktop shortcut. User data must live outside the install folder.
 - App updates use GitHub Releases. The app checks the latest release, asks for confirmation, downloads the versioned `SteamHidBridge-updater.ps1` release asset, closes all bridge instances, and replaces the published app folder. Do not bundle updater logic in the app package, and do not make the running process overwrite its own executable directly.
 - Runtime settings and logs belong under `%LOCALAPPDATA%\SteamHidBridge\`. Keep app lifecycle/error logging in `logs/app.log` and updater wrapper output in `logs/update.log`; do not add new ad hoc log files without a documented need.
-- Startup must not rewrite settings, regenerate the SRM manifest, or write Steam Input action manifests. Startup must not mutate Steam caches, SRM parser config, controller layouts, or Steam shortcut databases.
+- Startup must not rewrite settings or regenerate the SRM manifest. Startup must not mutate Steam caches, SRM parser config, controller layouts, or Steam shortcut databases.
 - Steam Input config forcing uses Steam's official `steam://forceinputappid/<appid>` URL only while the configured receiver is foreground, and resets with `steam://forceinputappid/0` when foreground is lost or the bridge exits.
-- Input modes are profile-scoped. They are `legacyMouse` and `steamInputActions`, labeled in the UI as `Virtual Mouse` and `Steam Input`. Legacy mouse observes Steam's virtual mouse output through Windows Raw Input. Steam Input uses Steamworks.NET/ISteamInput to poll game actions defined by the bridge action manifest.
-- The Steam Input action manifest should stay minimal: one `BridgeMouse` action set, one `absolute_mouse` pointer action, and digital actions for left/right/middle/back/forward click plus wheel up/down. Steam Input uses the bundled manifest when launched from Steam; do not write into Steam controller_config or reintroduce the old appid-driven export flow.
-- Mouse frames flow through `BridgeRuntime` to the GUI preview at a throttled display rate and to the profile-selected output mode after foreground receiver gating passes. Supported output modes are visualize-only and board USB serial transport.
+- Input is always Steam's legacy virtual mouse path observed through Windows Raw Input. Do not reintroduce Steamworks/ISteamInput action polling, action manifests, or per-profile input modes without a new validated reason.
+- Mouse frames flow through `BridgeSession` directly to the GUI preview and to the profile-selected output mode after foreground receiver gating passes. Supported output modes are visualize-only and board USB serial transport.
 - Shared C# protocol library for frame encoding, validation, and the HID input payload.
 - PlatformIO firmware placeholder for Teensy 4.0.
 - Scripts expose a small top-level command surface: `scripts/check.ps1`, `scripts/publish.ps1`, `scripts/release.ps1`, and `scripts/install.ps1`. Helper scripts live under `scripts/internal/`. Do not add new public scripts without a strong workflow reason. `check.ps1` should validate formatting, C# build, and firmware build. `publish.ps1` should package all deployable app-owned artifacts.
@@ -133,7 +130,7 @@ Validate Steam shortcut/runtime behavior before building more UI:
 9. Confirm Steam Controller, DualSense, or other gyro-capable controllers can be configured through Steam legacy mouse bindings and produce usable mouse deltas.
 10. Forward those deltas to the Teensy and verify HID mouse output.
 
-Do not implement Steam config editing, Steam VDF rewriting beyond the app-owned action manifest, or automatic Steam layout import/export in v1. Those are future research items.
+Do not implement Steam config editing, Steam VDF rewriting, or automatic Steam layout import/export in v1. Those are future research items.
 
 ## Repository Layout
 
@@ -146,7 +143,6 @@ app/SteamHidBridge.App/Ui/
 app/SteamHidBridge.App/Core/
 app/SteamHidBridge.App/Configuration/
 app/SteamHidBridge.App/Platform/
-app/SteamHidBridge.App/Update/
 app/SteamHidBridge.Protocol/
 scripts/
 README.md

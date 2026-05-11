@@ -1,14 +1,12 @@
 using System;
 using System.Diagnostics;
 using System.IO;
-using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Threading;
 using SteamHidBridge.App.Configuration;
 using SteamHidBridge.App.Core;
 using SteamHidBridge.App.Platform;
 using SteamHidBridge.App.Platform.App;
-using SteamHidBridge.App.Platform.Steam;
 using SteamHidBridge.App.Platform.Windows;
 using SteamHidBridge.App.Ui.ViewModels;
 using SteamHidBridge.App.Ui.Views;
@@ -22,10 +20,15 @@ namespace SteamHidBridge.App;
 /// </summary>
 public partial class App : Application
 {
+    private sealed record AppRuntime(
+        MainWindowViewModel MainWindowViewModel,
+        BridgeSession BridgeSession,
+        GeneralSettingsViewModel GeneralSettingsViewModel,
+        OutputViewModel OutputViewModel,
+        ProfileSettingsViewModel ProfileSettingsViewModel);
+
     private TrayIconHost? trayIconHost;
-    private MainWindowViewModel? mainWindowViewModel;
-    private BridgeRuntime? bridgeRuntime;
-    private SteamInputMouseEmitter? steamInputMouseEmitter;
+    private BridgeSession? bridgeSession;
     private ShutdownSignalListener? shutdownSignalListener;
     private RawMouseInputWindowHook? rawMouseInputWindowHook;
     private bool hideMainWindowToTrayOnClose;
@@ -53,64 +56,28 @@ public partial class App : Application
 
             BridgeLaunchOptions launchOptions = BridgeLaunchOptions.Parse(e.Args);
             hideMainWindowToTrayOnClose = !string.IsNullOrWhiteSpace(launchOptions.ProfileId);
+            AppRuntime runtime = CreateRuntime(launchOptions, LoadSettingsWithRecovery());
+            bridgeSession = runtime.BridgeSession;
+            WireSessionEvents(runtime.BridgeSession, runtime.OutputViewModel);
+            runtime.GeneralSettingsViewModel.ExitRequested += ExitApplication;
 
-            try
+            if (!string.IsNullOrWhiteSpace(launchOptions.ProfileId))
             {
-                AppSettings settings = AppSettingsFile.LoadDefault();
-                AppThemeManager.Apply(settings.General.Theme);
-                ConfigureSteamLibraryPath();
-
-                bridgeRuntime = new BridgeRuntime(launchOptions, settings.General.BoardPort);
-                steamInputMouseEmitter = new SteamInputMouseEmitter(bridgeRuntime.PublishSteamInputMouseInput, bridgeRuntime.SetInputStatus);
-                mainWindowViewModel = new MainWindowViewModel(
-                    launchOptions,
-                    settings,
-                    bridgeRuntime,
-                        ApplyInputMode,
-                        bridgeRuntime.SetOutputMode,
-                        bridgeRuntime.SetBoardPort,
-                        AppThemeManager.Apply,
-                        ConfirmUpdate,
-                        action => Dispatcher.BeginInvoke(action));
-            }
-            catch (InvalidDataException ex)
-            {
-                _ = MessageBox.Show(
-                    ex.Message,
-                    "Steam HID Bridge Settings Reset",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Warning);
-                AppSettings settings = new();
-                AppThemeManager.Apply(settings.General.Theme);
-                ConfigureSteamLibraryPath();
-
-                bridgeRuntime = new BridgeRuntime(launchOptions, settings.General.BoardPort);
-                steamInputMouseEmitter = new SteamInputMouseEmitter(bridgeRuntime.PublishSteamInputMouseInput, bridgeRuntime.SetInputStatus);
-                mainWindowViewModel = new MainWindowViewModel(
-                    launchOptions,
-                    settings,
-                    bridgeRuntime,
-                        ApplyInputMode,
-                        bridgeRuntime.SetOutputMode,
-                        bridgeRuntime.SetBoardPort,
-                        AppThemeManager.Apply,
-                        ConfirmUpdate,
-                        action => Dispatcher.BeginInvoke(action));
+                _ = runtime.ProfileSettingsViewModel.LaunchRequestedProfileAsync();
             }
 
-            mainWindowViewModel.ExitRequested += ExitApplication;
             shutdownSignalListener = new ShutdownSignalListener(() => Dispatcher.BeginInvoke(() => ExitApplication(0)));
 
             MainWindow window = new()
             {
-                DataContext = mainWindowViewModel
+                DataContext = runtime.MainWindowViewModel
             };
 
             window.Closing += OnMainWindowClosing;
             MainWindow = window;
 
-            trayIconHost = new TrayIconHost(window, mainWindowViewModel.TrayText, () => ExitApplication(0));
-            rawMouseInputWindowHook = new RawMouseInputWindowHook(window, bridgeRuntime.PublishLegacyMouseInput);
+            trayIconHost = new TrayIconHost(window, runtime.MainWindowViewModel.TrayText, () => ExitApplication(0));
+            rawMouseInputWindowHook = new RawMouseInputWindowHook(window, bridgeSession.PublishMouseInput);
             if (!string.IsNullOrWhiteSpace(launchOptions.ProfileId))
             {
                 window.Show();
@@ -137,8 +104,7 @@ public partial class App : Application
     {
         isExiting = true;
 
-        bridgeRuntime?.Dispose();
-        steamInputMouseEmitter?.Dispose();
+        bridgeSession?.Dispose();
         trayIconHost?.Dispose();
         shutdownSignalListener?.Dispose();
         rawMouseInputWindowHook?.Dispose();
@@ -166,10 +132,55 @@ public partial class App : Application
         }
     }
 
-    private void ApplyInputMode(BridgeInputMode inputMode)
+    private static AppSettings LoadSettingsWithRecovery()
     {
-        bridgeRuntime?.SetInputMode(inputMode);
-        steamInputMouseEmitter?.SetEnabled(inputMode == BridgeInputMode.SteamInputActions);
+        try
+        {
+            return AppSettingsFile.LoadDefault();
+        }
+        catch (InvalidDataException ex)
+        {
+            _ = MessageBox.Show(
+                ex.Message,
+                "Steam HID Bridge Settings Reset",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+            return new AppSettings();
+        }
+    }
+
+    private static AppRuntime CreateRuntime(BridgeLaunchOptions launchOptions, AppSettings settings)
+    {
+        AppThemeManager.Apply(settings.General.Theme);
+
+        BridgeAppService appService = new(settings);
+        BridgeSession session = new(launchOptions, appService.BoardPort);
+        ProfileSettingsViewModel profileSettingsViewModel = new(appService, session, launchOptions.ProfileId);
+        GeneralSettingsViewModel generalSettingsViewModel = new(
+            appService,
+            session.SetBoardPort,
+            AppThemeManager.Apply,
+            ConfirmUpdate);
+        OutputViewModel outputViewModel = new();
+        MainWindowViewModel mainWindowViewModel = new(
+            launchOptions.ProfileId,
+            profileSettingsViewModel,
+            generalSettingsViewModel,
+            outputViewModel);
+
+        return new AppRuntime(
+            mainWindowViewModel,
+            session,
+            generalSettingsViewModel,
+            outputViewModel,
+            profileSettingsViewModel);
+    }
+
+    private void WireSessionEvents(BridgeSession session, OutputViewModel outputViewModel)
+    {
+        session.MouseInput += frame => Dispatcher.BeginInvoke(() => outputViewModel.PreviewMouseInput(frame));
+        session.StatusChanged += status => Dispatcher.BeginInvoke(() => outputViewModel.ApplyRuntimeStatus(status));
+        session.ExitRequested += exitCode => Dispatcher.BeginInvoke(() => ExitApplication(exitCode));
     }
 
     private void ExitApplication(int exitCode)
@@ -234,17 +245,4 @@ public partial class App : Application
         Trace.Listeners.Clear();
         _ = Trace.Listeners.Add(new TextWriterTraceListener(AppDataPaths.AppLogPath));
     }
-
-    private static void ConfigureSteamLibraryPath()
-    {
-        string steamDirectory = Path.Combine(AppContext.BaseDirectory, "Steam");
-        if (Directory.Exists(steamDirectory))
-        {
-            _ = SetDllDirectory(steamDirectory);
-        }
-    }
-
-    [LibraryImport("kernel32.dll", EntryPoint = "SetDllDirectoryW", SetLastError = true, StringMarshalling = StringMarshalling.Utf16)]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static partial bool SetDllDirectory(string lpPathName);
 }

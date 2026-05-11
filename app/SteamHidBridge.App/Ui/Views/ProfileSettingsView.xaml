@@ -13,8 +13,6 @@
         <RowDefinition Height="Auto"/>
         <RowDefinition Height="Auto"/>
         <RowDefinition Height="Auto"/>
-        <RowDefinition Height="Auto"/>
-        <RowDefinition Height="Auto"/>
       </Grid.RowDefinitions>
       <Grid.ColumnDefinitions>
         <ColumnDefinition Width="120"/>
@@ -91,24 +89,10 @@
                ToolTip="Working directory for the launched process."/>
 
       <TextBlock Grid.Row="6"
-                 Text="Input"
-                 Margin="0,8,0,0"
-                 VerticalAlignment="Center"/>
-      <ComboBox Grid.Row="6"
-                Grid.Column="1"
-                Grid.ColumnSpan="2"
-                Margin="0,8,0,0"
-                ItemsSource="{Binding InputModeOptions}"
-                DisplayMemberPath="Label"
-                SelectedValuePath="Value"
-                SelectedValue="{Binding SelectedInputMode}"
-                ToolTip="Virtual Mouse observes Steam's virtual mouse output. Steam Input reads game actions; bind the actions in Steam Input."/>
-
-      <TextBlock Grid.Row="7"
                  Text="Output"
                  Margin="0,8,0,0"
                  VerticalAlignment="Center"/>
-      <ComboBox Grid.Row="7"
+      <ComboBox Grid.Row="6"
                 Grid.Column="1"
                 Grid.ColumnSpan="2"
                 Margin="0,8,0,0"
@@ -118,18 +102,18 @@
                 SelectedValue="{Binding SelectedOutputMode}"
                 ToolTip="Choose no output or board physical mouse output."/>
 
-      <TextBlock Grid.Row="8"
+      <TextBlock Grid.Row="7"
                  Text="Receivers *"
                  Margin="0,8,0,0"
                  VerticalAlignment="Center"/>
-      <TextBox Grid.Row="8"
+      <TextBox Grid.Row="7"
                Grid.Column="1"
                Grid.ColumnSpan="2"
                Margin="0,8,0,0"
                Text="{Binding EditReceiverProcessesText, UpdateSourceTrigger=PropertyChanged}"
                ToolTip="Pipe separated process names that enable forwarding when foreground. For example Game1.exe | Game2.exe."/>
 
-      <StackPanel Grid.Row="9"
+      <StackPanel Grid.Row="8"
                   Grid.Column="1"
                   Grid.ColumnSpan="2"
                   Orientation="Horizontal"

@@ -13,16 +13,22 @@
         MinHeight="500"
         FontFamily="Segoe UI">
     <Window.Resources>
-        <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
-            <Setter Property="MinWidth" Value="132" />
-            <Setter Property="MinHeight" Value="24" />
+        <Style TargetType="Button"
+               BasedOn="{StaticResource {x:Type Button}}">
+            <Setter Property="MinWidth"
+                    Value="132"/>
+            <Setter Property="MinHeight"
+                    Value="24"/>
         </Style>
     </Window.Resources>
 
     <DockPanel Margin="12">
-        <StackPanel DockPanel.Dock="Top" Margin="0,0,0,10">
-            <TextBlock Text="Steam HID Bridge" FontSize="16" FontWeight="SemiBold" />
-            <TextBlock Text="{Binding ProcessText}" />
+        <StackPanel DockPanel.Dock="Top"
+                    Margin="0,0,0,10">
+            <TextBlock Text="Steam HID Bridge"
+                       FontSize="16"
+                       FontWeight="SemiBold"/>
+            <TextBlock Text="{Binding ProcessText}"/>
         </StackPanel>
 
         <Border DockPanel.Dock="Top"
@@ -35,38 +41,41 @@
                     <StackPanel Orientation="Horizontal">
                         <Ellipse Width="10"
                                  Height="10"
-                                 Fill="{Binding StatusBrush}"
+                                 Fill="{Binding Output.StatusBrush}"
                                  Margin="0,0,6,0"
-                                 VerticalAlignment="Center" />
-                        <TextBlock Text="{Binding ForwardingStatus}" />
+                                 VerticalAlignment="Center"/>
+                        <TextBlock Text="{Binding Output.ForwardingStatus}"/>
                     </StackPanel>
                 </StatusBarItem>
                 <TextBlock Text="|"
                            Margin="4,0"
                            VerticalAlignment="Center"
-                           Foreground="{DynamicResource {x:Static SystemColors.GrayTextBrushKey}}" />
+                           Foreground="{DynamicResource {x:Static SystemColors.GrayTextBrushKey}}"/>
                 <StatusBarItem>
-                    <TextBlock Text="{Binding InputSourceText}" />
+                    <TextBlock Text="{Binding Output.InputSourceText}"/>
                 </StatusBarItem>
                 <TextBlock Text="|"
                            Margin="4,0"
                            VerticalAlignment="Center"
-                           Foreground="{DynamicResource {x:Static SystemColors.GrayTextBrushKey}}" />
+                           Foreground="{DynamicResource {x:Static SystemColors.GrayTextBrushKey}}"/>
                 <StatusBarItem>
-                    <TextBlock Text="{Binding OutputTargetText}" />
+                    <TextBlock Text="{Binding Output.OutputTargetText}"/>
                 </StatusBarItem>
             </StatusBar>
         </Border>
 
         <TabControl>
             <TabItem Header="Profiles">
-                <views:ProfileSettingsView Margin="12" />
+                <views:ProfileSettingsView Margin="12"
+                                           DataContext="{Binding Profile}"/>
             </TabItem>
             <TabItem Header="Settings">
-                <views:GeneralSettingsView Margin="12" />
+                <views:GeneralSettingsView Margin="12"
+                                           DataContext="{Binding General}"/>
             </TabItem>
             <TabItem Header="Output">
-                <views:OutputView Margin="12" />
+                <views:OutputView Margin="12"
+                                  DataContext="{Binding Output}"/>
             </TabItem>
         </TabControl>
     </DockPanel>

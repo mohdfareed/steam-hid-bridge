@@ -19,19 +19,15 @@ internal sealed class BoardSerialMouseOutput(int? configuredPortNumber) : IDispo
     private long nextConnectAttempt;
     private int? configuredPortNumber = configuredPortNumber;
     private bool isDisposed;
+    private BoardOutputStatus status = new(OutputConnectionState.Disconnected);
 
-    public BoardOutputStatus Status
+    public BoardOutputStatus GetStatus()
     {
-        get
+        lock (syncLock)
         {
-            lock (syncLock)
-            {
-                return field;
-            }
+            return status;
         }
-
-        private set;
-    } = new(OutputConnectionState.Disconnected);
+    }
 
     public void SetPort(int? value)
     {
@@ -40,7 +36,7 @@ internal sealed class BoardSerialMouseOutput(int? configuredPortNumber) : IDispo
             configuredPortNumber = value;
             ClosePort();
             nextConnectAttempt = 0;
-            Status = new(OutputConnectionState.Disconnected);
+            status = new(OutputConnectionState.Disconnected);
         }
     }
 
@@ -80,19 +76,19 @@ internal sealed class BoardSerialMouseOutput(int? configuredPortNumber) : IDispo
             BridgeFrame bridgeFrame = new(BridgeCommand.HidInput, sequence++, payload);
             if (!bridgeFrame.TryWrite(frameBuffer, out int bytesWritten))
             {
-                Status = new(OutputConnectionState.Error, Error: OutputError.FrameEncodeFailed);
+                status = new(OutputConnectionState.Error, Error: OutputError.FrameEncodeFailed);
                 return;
             }
 
             try
             {
                 port.Write(frameBuffer, 0, bytesWritten);
-                Status = new(OutputConnectionState.Connected, port.PortName);
+                status = new(OutputConnectionState.Connected, port.PortName);
             }
             catch (Exception ex) when (ex is IOException or InvalidOperationException or TimeoutException or UnauthorizedAccessException)
             {
                 Trace.TraceError($"board-write-failed{Environment.NewLine}{ex}");
-                Status = new(OutputConnectionState.Error, port.PortName, OutputError.WriteFailed);
+                status = new(OutputConnectionState.Error, port.PortName, OutputError.WriteFailed);
                 ClosePort();
             }
         }
@@ -135,7 +131,7 @@ internal sealed class BoardSerialMouseOutput(int? configuredPortNumber) : IDispo
             {
                 port.Open();
                 serialPort = port;
-                Status = new(OutputConnectionState.Connected, portName);
+                status = new(OutputConnectionState.Connected, portName);
                 return serialPort;
             }
             catch (Exception ex) when (ex is IOException or InvalidOperationException or TimeoutException or UnauthorizedAccessException)
@@ -144,7 +140,7 @@ internal sealed class BoardSerialMouseOutput(int? configuredPortNumber) : IDispo
             }
         }
 
-        Status = configuredPortNumber is int portNumber
+        status = configuredPortNumber is int portNumber
             ? new BoardOutputStatus(OutputConnectionState.Disconnected, ToWindowsPortName(portNumber))
             : new BoardOutputStatus(OutputConnectionState.Disconnected);
         return null;

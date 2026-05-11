@@ -3,7 +3,7 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
 
-namespace SteamHidBridge.App.Platform.Steam;
+namespace SteamHidBridge.App.Platform;
 
 internal sealed class SteamInputConfigForcer
 {

@@ -7,16 +7,11 @@ Steam Input remains the configuration layer; this project handles profile launch
 
 ## Features
 
-- Profiles are JSON-based, allowing external management and version control.
-- Integrates with Steam Rom Manager for the management of non-Steam game shortcuts.
-  - The app exports a manifest file of the defined profiles, which is consumed by a manual parser created in SRM.
-- Games define separate launched and receiving process names, allowing:
-  - Accurate launch state tracking allows Steam to reliably start and stop games.
-  - Foreground gating such that input is only sent when the game is active.
-  - Steam Input configurations to reliably activate when the game is active.
-- Reads mouse events from either Steam's virtual mouse output or Steam Input game actions.
-- Forwards mouse events to a physical board over serial, emulating a physical mouse HID device.
-- Consistent shortcuts allows for Steam Cloud sync of Steam Input configurations (*undocumented/unreliable*).
+- JSON-based profiles in `%LOCALAPPDATA%\SteamHidBridge\appsettings.json`
+- Steam ROM Manager manifest export for bridge-targeted shortcuts
+- Foreground gating so output is only forwarded when the configured receiver process is active
+- Optional game launch ownership so Steam start/stop tracks the bridge while the bridge manages the launched game
+- Serial mouse forwarding to the board firmware bundled with the app
 
 ## Install
 
@@ -42,14 +37,11 @@ User data lives outside the install folder:
 1. Start the app and create profiles.
 2. Save the profiles.
 3. Point a Steam ROM Manager manual parser at the SRM manifest path shown in the app.
-  - Parser type: `Manual`
-  - Steam directory: `${steamdirglobal}`
-  - Manifests directory: Paste from the app's settings (e.g. `~\AppData\Local\SteamHidBridge\srm`)
-5. Parse the entries in SRM.
-6. Restart Steam after changing Steam Input action definitions.
-7. Launch the generated Steam shortcut for the profile you want.
-  - If a game is using Steam Input mode, the first launch registers the mouse game actions.
-  - Restarting the game will display the game actions in Steam Input's configuration screen.
+   - Parser type: `Manual`
+   - Steam directory: `${steamdirglobal}`
+   - Manifests directory: Paste the directory that contains the exported manifest file
+4. Parse the entries in SRM and restart Steam.
+6. Launch the generated Steam shortcut for the profile you want.
 
 ## Build
 
