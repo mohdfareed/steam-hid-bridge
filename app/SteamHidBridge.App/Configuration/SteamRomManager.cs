@@ -15,7 +15,7 @@ internal static class SrmManifestWriter
             throw new InvalidOperationException("Could not find bridge executable path.");
         }
 
-        string manifestPath = ExpandPath(settings.General.SrmManifestPath);
+        string manifestPath = FileSystemPath.Normalize(settings.General.SrmManifestPath);
         if (string.IsNullOrWhiteSpace(manifestPath))
         {
             throw new InvalidOperationException("Steam ROM Manager manifest path is empty.");
@@ -29,18 +29,6 @@ internal static class SrmManifestWriter
 
         string json = SteamRomManagerExport.CreateJson(settings.Games, bridgeExecutable);
         File.WriteAllText(manifestPath, json);
-    }
-
-    private static string ExpandPath(string path)
-    {
-        path = Environment.ExpandEnvironmentVariables(path.Trim());
-        if (path.StartsWith(@"~\", StringComparison.Ordinal) || path.StartsWith("~/", StringComparison.Ordinal))
-        {
-            string home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-            path = Path.Combine(home, path[2..]);
-        }
-
-        return path;
     }
 }
 

@@ -11,6 +11,8 @@
         Height="660"
         MinWidth="760"
         MinHeight="500"
+        Topmost="True"
+        ShowActivated="False"
         FontFamily="Segoe UI">
     <Window.Resources>
         <Style TargetType="Button"
@@ -30,32 +32,6 @@
                        FontWeight="SemiBold"/>
             <TextBlock Text="{Binding ProcessText}"/>
         </StackPanel>
-
-        <Border DockPanel.Dock="Top"
-                BorderBrush="{DynamicResource {x:Static SystemColors.ControlDarkBrushKey}}"
-                BorderThickness="1"
-                CornerRadius="3"
-                Margin="0,0,0,10">
-            <StatusBar Padding="4,0">
-                <StatusBarItem>
-                    <StackPanel Orientation="Horizontal">
-                        <Ellipse Width="10"
-                                 Height="10"
-                                 Fill="{Binding Output.StatusBrush}"
-                                 Margin="0,0,6,0"
-                                 VerticalAlignment="Center"/>
-                        <TextBlock Text="{Binding Output.ForwardingStatus}"/>
-                    </StackPanel>
-                </StatusBarItem>
-                <TextBlock Text="|"
-                           Margin="4,0"
-                           VerticalAlignment="Center"
-                           Foreground="{DynamicResource {x:Static SystemColors.GrayTextBrushKey}}"/>
-                <StatusBarItem>
-                    <TextBlock Text="{Binding Output.OutputTargetText}"/>
-                </StatusBarItem>
-            </StatusBar>
-        </Border>
 
         <TabControl>
             <TabItem Header="Profiles">

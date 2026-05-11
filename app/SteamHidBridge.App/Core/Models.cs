@@ -19,11 +19,13 @@ internal enum OutputConnectionState
 internal enum OutputError
 {
     None,
+    ConnectFailed,
     FrameEncodeFailed,
     WriteFailed
 }
 
-internal readonly record struct BoardOutputStatus(
+internal readonly record struct OutputStatus(
     OutputConnectionState State,
     string? Endpoint = null,
-    OutputError Error = OutputError.None);
+    OutputError Error = OutputError.None,
+    MouseInputFrame? LastFrame = null);

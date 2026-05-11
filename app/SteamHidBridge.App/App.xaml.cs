@@ -1,6 +1,7 @@
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Threading;
 using System.Windows;
 using System.Windows.Threading;
 using SteamHidBridge.App.Configuration;
@@ -58,7 +59,11 @@ public partial class App : Application
             hideMainWindowToTrayOnClose = !string.IsNullOrWhiteSpace(launchOptions.ProfileId);
             AppRuntime runtime = CreateRuntime(launchOptions, LoadSettingsWithRecovery());
             bridgeSession = runtime.BridgeSession;
-            WireSessionEvents(runtime.BridgeSession, runtime.OutputViewModel);
+            WireSessionEvents(
+                runtime.BridgeSession,
+                runtime.OutputViewModel,
+                runtime.ProfileSettingsViewModel,
+                runtime.GeneralSettingsViewModel);
             runtime.GeneralSettingsViewModel.ExitRequested += ExitApplication;
 
             if (!string.IsNullOrWhiteSpace(launchOptions.ProfileId))
@@ -80,8 +85,11 @@ public partial class App : Application
             rawMouseInputWindowHook = new RawMouseInputWindowHook(window, bridgeSession.PublishMouseInput);
             if (!string.IsNullOrWhiteSpace(launchOptions.ProfileId))
             {
+                window.ShowInTaskbar = false;
+                window.Opacity = 0;
                 window.Show();
                 window.Hide();
+                window.Opacity = 1;
             }
             else
             {
@@ -128,6 +136,7 @@ public partial class App : Application
         e.Cancel = true;
         if (sender is Window window)
         {
+            window.ShowInTaskbar = false;
             window.Hide();
         }
     }
@@ -154,11 +163,12 @@ public partial class App : Application
         AppThemeManager.Apply(settings.General.Theme);
 
         BridgeAppService appService = new(settings);
-        BridgeSession session = new(launchOptions, appService.BoardPort);
+        BridgeSession session = new(appService.BoardPort, appService.ViiperHost, appService.ViiperPort);
         ProfileSettingsViewModel profileSettingsViewModel = new(appService, session, launchOptions.ProfileId);
         GeneralSettingsViewModel generalSettingsViewModel = new(
             appService,
             session.SetBoardPort,
+            session.SetViiperEndpoint,
             AppThemeManager.Apply,
             ConfirmUpdate);
         OutputViewModel outputViewModel = new();
@@ -176,10 +186,70 @@ public partial class App : Application
             profileSettingsViewModel);
     }
 
-    private void WireSessionEvents(BridgeSession session, OutputViewModel outputViewModel)
+    private void WireSessionEvents(
+        BridgeSession session,
+        OutputViewModel outputViewModel,
+        ProfileSettingsViewModel profileSettingsViewModel,
+        GeneralSettingsViewModel generalSettingsViewModel)
     {
-        session.MouseInput += frame => Dispatcher.BeginInvoke(() => outputViewModel.PreviewMouseInput(frame));
-        session.StatusChanged += status => Dispatcher.BeginInvoke(() => outputViewModel.ApplyRuntimeStatus(status));
+        Lock previewLock = new();
+        MouseInputFrame latestPreviewFrame = default;
+        bool previewScheduled = false;
+
+        void FlushPreview()
+        {
+            MouseInputFrame frame;
+            lock (previewLock)
+            {
+                frame = latestPreviewFrame;
+            }
+
+            outputViewModel.PreviewMouseInput(frame);
+
+            bool reschedule;
+            lock (previewLock)
+            {
+                if (frame.Equals(latestPreviewFrame))
+                {
+                    previewScheduled = false;
+                    reschedule = false;
+                }
+                else
+                {
+                    reschedule = true;
+                }
+            }
+
+            if (reschedule)
+            {
+                _ = Dispatcher.BeginInvoke(FlushPreview, DispatcherPriority.Background);
+            }
+        }
+
+        session.MouseInput += frame =>
+        {
+            bool schedule;
+            lock (previewLock)
+            {
+                latestPreviewFrame = frame;
+                schedule = !previewScheduled;
+                if (schedule)
+                {
+                    previewScheduled = true;
+                }
+            }
+
+            if (schedule)
+            {
+                _ = Dispatcher.BeginInvoke(FlushPreview, DispatcherPriority.Background);
+            }
+        };
+        session.StatusChanged += status => Dispatcher.BeginInvoke(() =>
+        {
+            outputViewModel.ApplyRuntimeStatus(status);
+            profileSettingsViewModel.ApplySessionStatus(status);
+            generalSettingsViewModel.ApplySessionStatus(status);
+        });
         session.ExitRequested += exitCode => Dispatcher.BeginInvoke(() => ExitApplication(exitCode));
     }
 

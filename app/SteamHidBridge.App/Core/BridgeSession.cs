@@ -4,19 +4,23 @@ using System.Threading;
 using System.Threading.Tasks;
 using SteamHidBridge.App.Configuration;
 using SteamHidBridge.App.Platform;
-using SteamHidBridge.App.Platform.App;
+using SteamHidBridge.App.Platform.Teensy;
+using SteamHidBridge.App.Platform.Viiper;
 
 namespace SteamHidBridge.App.Core;
 
 internal sealed record BridgeSessionStatus(
     bool ForwardingEnabled,
+    bool HasRunningLaunch,
     BridgeOutputMode OutputMode,
-    BoardOutputStatus BoardOutput);
+    OutputStatus BoardOutput,
+    OutputStatus ViiperOutput);
 
 internal sealed class BridgeSession : IDisposable
 {
     private static readonly TimeSpan StatusInterval = TimeSpan.FromMilliseconds(250);
-    private readonly BoardSerialMouseOutput boardOutput;
+    private readonly TeensySerialMouseOutput boardOutput;
+    private readonly ViiperMouseOutput viiperOutput;
     private readonly SessionProcessMonitor processMonitor;
     private readonly SteamInputConfigForcer steamInputConfigForcer = new();
     private readonly CancellationTokenSource cancellation = new();
@@ -26,10 +30,11 @@ internal sealed class BridgeSession : IDisposable
     private bool isForwarding;
     private BridgeOutputMode outputMode = BridgeOutputMode.Board;
 
-    public BridgeSession(BridgeLaunchOptions launchOptions, int? boardPort)
+    public BridgeSession(int? boardPort, string viiperHost, int viiperPort)
     {
-        processMonitor = new SessionProcessMonitor(!string.IsNullOrWhiteSpace(launchOptions.ProfileId));
-        boardOutput = new BoardSerialMouseOutput(boardPort);
+        processMonitor = new SessionProcessMonitor();
+        boardOutput = new TeensySerialMouseOutput(boardPort);
+        viiperOutput = new ViiperMouseOutput(viiperHost, viiperPort);
         statusTask = Task.Run(RunStatusLoopAsync);
     }
 
@@ -43,19 +48,37 @@ internal sealed class BridgeSession : IDisposable
         {
             boardOutput.Consume(frame);
         }
+        else if (isForwarding && outputMode == BridgeOutputMode.Viiper)
+        {
+            viiperOutput.Consume(frame);
+        }
 
         MouseInput?.Invoke(frame);
     }
 
     public void SetOutputMode(BridgeOutputMode value)
     {
+        if (outputMode == value)
+        {
+            PublishStatus();
+            return;
+        }
+
+        ResetOutputState(outputMode);
         outputMode = value;
+        viiperOutput.SetEnabled(value == BridgeOutputMode.Viiper);
         PublishStatus();
     }
 
     public void SetBoardPort(int? value)
     {
         boardOutput.SetPort(value);
+        PublishStatus();
+    }
+
+    public void SetViiperEndpoint(string host, int port)
+    {
+        viiperOutput.SetEndpoint(host, port);
         PublishStatus();
     }
 
@@ -94,6 +117,7 @@ internal sealed class BridgeSession : IDisposable
         processMonitor.Dispose();
         steamInputConfigForcer.Reset();
         boardOutput.Dispose();
+        viiperOutput.Dispose();
         cancellation.Dispose();
     }
 
@@ -117,6 +141,10 @@ internal sealed class BridgeSession : IDisposable
         {
             boardOutput.Refresh();
         }
+        else if (outputMode == BridgeOutputMode.Viiper)
+        {
+            viiperOutput.Refresh();
+        }
 
         ReceiverState receiverState = processMonitor.Refresh();
         if (receiverState.ShouldExit)
@@ -132,13 +160,35 @@ internal sealed class BridgeSession : IDisposable
 
     private void PublishStatus()
     {
-        StatusChanged?.Invoke(new BridgeSessionStatus(isForwarding, outputMode, boardOutput.GetStatus()));
+        StatusChanged?.Invoke(new BridgeSessionStatus(
+            isForwarding,
+            processMonitor.HasRunningLaunch,
+            outputMode,
+            boardOutput.GetStatus(),
+            viiperOutput.GetStatus()));
     }
 
     private void SetForwarding(bool value)
     {
+        if (isForwarding && !value)
+        {
+            ResetOutputState(outputMode);
+        }
+
         isForwarding = value;
         _ = steamInputConfigForcer.TrySetForced(value);
+    }
+
+    private void ResetOutputState(BridgeOutputMode mode)
+    {
+        if (mode == BridgeOutputMode.Board)
+        {
+            boardOutput.ResetState();
+        }
+        else if (mode == BridgeOutputMode.Viiper)
+        {
+            viiperOutput.ResetState();
+        }
     }
 
     private void RequestExit()

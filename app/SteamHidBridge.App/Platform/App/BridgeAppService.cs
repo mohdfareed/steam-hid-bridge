@@ -4,6 +4,8 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using SteamHidBridge.App.Configuration;
+using SteamHidBridge.App.Platform.Teensy;
+using SteamHidBridge.App.Platform.Viiper;
 
 namespace SteamHidBridge.App.Platform.App;
 
@@ -18,6 +20,8 @@ internal sealed class BridgeAppService(AppSettings settings)
     public AppTheme Theme => settings.General.Theme;
     public int? BoardPort => settings.General.BoardPort;
     public string SrmManifestPath => settings.General.SrmManifestPath;
+    public string ViiperHost => settings.General.ViiperHost;
+    public int ViiperPort => settings.General.ViiperPort;
 
     public IReadOnlyList<string> GetGameIds()
     {
@@ -79,11 +83,13 @@ internal sealed class BridgeAppService(AppSettings settings)
         AppSettingsFile.SaveDefault(settings);
     }
 
-    public void SaveGeneral(AppTheme theme, int? boardPort, string srmManifestPath)
+    public void SaveGeneral(AppTheme theme, int? boardPort, string srmManifestPath, string viiperHost, int viiperPort)
     {
         settings.General.Theme = theme;
         settings.General.BoardPort = boardPort;
-        settings.General.SrmManifestPath = srmManifestPath.Trim();
+        settings.General.SrmManifestPath = FileSystemPath.Normalize(srmManifestPath);
+        settings.General.ViiperHost = viiperHost.Trim();
+        settings.General.ViiperPort = viiperPort;
         AppSettingsFile.SaveDefault(settings);
     }
 
@@ -105,6 +111,11 @@ internal sealed class BridgeAppService(AppSettings settings)
     public Task<AppUpdateCheckResult> CheckForUpdateAsync(CancellationToken cancellationToken = default)
     {
         return appUpdater.CheckLatestAsync(cancellationToken);
+    }
+
+    public static Task CheckViiperAsync(string host, int port, CancellationToken cancellationToken = default)
+    {
+        return ViiperProbe.CheckAsync(host, port, cancellationToken);
     }
 
     public static Task StartUpdateAsync(AppUpdateCheckResult update, CancellationToken cancellationToken = default)

@@ -14,7 +14,8 @@ internal enum AppTheme
 internal enum BridgeOutputMode
 {
     None,
-    Board
+    Board,
+    Viiper
 }
 
 internal sealed class GameProfile
@@ -55,6 +56,8 @@ internal sealed class GeneralSettings
     public AppTheme Theme { get; set; } = AppTheme.System;
     public int? BoardPort { get; set; }
     public string SrmManifestPath { get; set; } = AppDataPaths.SrmManifestPath;
+    public string ViiperHost { get; set; } = "localhost";
+    public int ViiperPort { get; set; } = 3242;
 }
 
 internal sealed class AppSettings

@@ -3,11 +3,12 @@ using System.Diagnostics;
 using System.IO;
 using System.IO.Ports;
 using System.Threading;
+using SteamHidBridge.App.Core;
 using SteamHidBridge.Protocol;
 
-namespace SteamHidBridge.App.Core;
+namespace SteamHidBridge.App.Platform.Teensy;
 
-internal sealed class BoardSerialMouseOutput(int? configuredPortNumber) : IDisposable
+internal sealed class TeensySerialMouseOutput(int? port) : IDisposable
 {
     private const int BaudRate = 115200;
     private static readonly TimeSpan ReconnectInterval = TimeSpan.FromSeconds(1);
@@ -17,11 +18,11 @@ internal sealed class BoardSerialMouseOutput(int? configuredPortNumber) : IDispo
     private SerialPort? serialPort;
     private byte sequence;
     private long nextConnectAttempt;
-    private int? configuredPortNumber = configuredPortNumber;
+    private int? configuredPortNumber = port;
     private bool isDisposed;
-    private BoardOutputStatus status = new(OutputConnectionState.Disconnected);
+    private OutputStatus status = new(OutputConnectionState.Disconnected);
 
-    public BoardOutputStatus GetStatus()
+    public OutputStatus GetStatus()
     {
         lock (syncLock)
         {
@@ -83,15 +84,20 @@ internal sealed class BoardSerialMouseOutput(int? configuredPortNumber) : IDispo
             try
             {
                 port.Write(frameBuffer, 0, bytesWritten);
-                status = new(OutputConnectionState.Connected, port.PortName);
+                status = new(OutputConnectionState.Connected, port.PortName, LastFrame: frame);
             }
             catch (Exception ex) when (ex is IOException or InvalidOperationException or TimeoutException or UnauthorizedAccessException)
             {
                 Trace.TraceError($"board-write-failed{Environment.NewLine}{ex}");
-                status = new(OutputConnectionState.Error, port.PortName, OutputError.WriteFailed);
+                status = new(OutputConnectionState.Error, port.PortName, OutputError.WriteFailed, frame);
                 ClosePort();
             }
         }
+    }
+
+    public void ResetState()
+    {
+        Consume(new MouseInputFrame(0, 0, 0, MouseButtons.None));
     }
 
     public void Dispose()
@@ -141,8 +147,8 @@ internal sealed class BoardSerialMouseOutput(int? configuredPortNumber) : IDispo
         }
 
         status = configuredPortNumber is int portNumber
-            ? new BoardOutputStatus(OutputConnectionState.Disconnected, ToWindowsPortName(portNumber))
-            : new BoardOutputStatus(OutputConnectionState.Disconnected);
+            ? new OutputStatus(OutputConnectionState.Disconnected, ToWindowsPortName(portNumber))
+            : new OutputStatus(OutputConnectionState.Disconnected);
         return null;
     }
 

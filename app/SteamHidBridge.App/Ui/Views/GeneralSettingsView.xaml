@@ -3,116 +3,182 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
         <ScrollViewer VerticalScrollBarVisibility="Auto"
                       HorizontalScrollBarVisibility="Auto">
-                <Grid MinWidth="640">
-                        <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                        </Grid.RowDefinitions>
-                        <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="120"/>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="132"/>
-                        </Grid.ColumnDefinitions>
+                <StackPanel MinWidth="640">
+                        <GroupBox Header="Devices">
+                                <Grid>
+                                        <Grid.RowDefinitions>
+                                                <RowDefinition Height="Auto"/>
+                                                <RowDefinition Height="Auto"/>
+                                                <RowDefinition Height="Auto"/>
+                                                <RowDefinition Height="Auto"/>
+                                        </Grid.RowDefinitions>
+                                        <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="120"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="132"/>
+                                        </Grid.ColumnDefinitions>
 
-                        <TextBlock Text="Theme"
-                                   VerticalAlignment="Center"/>
-                        <ComboBox Grid.Column="1"
-                                  Grid.ColumnSpan="2"
-                                  ItemsSource="{Binding ThemeOptions}"
-                                  SelectedItem="{Binding SelectedTheme}"
-                                  ToolTip="Choose the app theme."/>
+                                        <StackPanel Orientation="Horizontal"
+                                                    VerticalAlignment="Center">
+                                                <TextBlock Text="Board port"/>
+                                                <Ellipse Width="10"
+                                                         Height="10"
+                                                         Margin="6,0,0,0"
+                                                         Fill="{Binding BoardStatusBrush}"
+                                                         Stroke="{Binding BoardStatusBrush}"
+                                                         ToolTip="{Binding BoardStatusToolTip}"/>
+                                        </StackPanel>
+                                        <TextBox Grid.Column="1"
+                                                 Grid.ColumnSpan="2"
+                                                 InputScope="Number"
+                                                 Text="{Binding BoardPort, UpdateSourceTrigger=PropertyChanged}"
+                                                 PreviewTextInput="BoardPort_PreviewTextInput"
+                                                 DataObject.Pasting="BoardPort_Pasting"
+                                                 ToolTip="Enter the COM port number. Leave empty for Auto."/>
 
-                        <TextBlock Grid.Row="1"
-                                   Text="Board port"
-                                   Margin="0,8,0,0"
-                                   VerticalAlignment="Center"/>
-                        <TextBox Grid.Row="1"
-                                 Grid.Column="1"
-                                 Grid.ColumnSpan="2"
-                                 Margin="0,8,0,0"
-                                 InputScope="Number"
-                                 Text="{Binding BoardPort, UpdateSourceTrigger=PropertyChanged}"
-                                 PreviewTextInput="BoardPort_PreviewTextInput"
-                                 DataObject.Pasting="BoardPort_Pasting"
-                                 ToolTip="Enter the COM port number. Leave empty for Auto."/>
+                                        <TextBlock Grid.Row="1"
+                                                   Text="Board firmware"
+                                                   Margin="0,8,0,0"
+                                                   VerticalAlignment="Center"/>
+                                        <TextBlock Grid.Row="1"
+                                                   Grid.Column="1"
+                                                   Text="{Binding BoardFirmwareText}"
+                                                   Margin="0,8,8,0"
+                                                   VerticalAlignment="Center"
+                                                   TextWrapping="Wrap"/>
+                                        <Button Grid.Row="1"
+                                                Grid.Column="2"
+                                                Content="Flash"
+                                                Margin="0,8,0,0"
+                                                Command="{Binding UpdateFirmwareCommand}"
+                                                ToolTip="Flash the board with the firmware bundled with this app."/>
 
-                        <TextBlock Grid.Row="3"
-                                   Text="App data"
-                                   Margin="0,8,0,0"
-                                   VerticalAlignment="Center"/>
-                        <TextBox Grid.Row="3"
-                                 Grid.Column="1"
-                                 Margin="0,8,8,0"
-                                 Text="{Binding AppDataPath, Mode=OneWay}"
-                                 IsReadOnly="True"
-                                 ToolTip="Folder containing appsettings.json, logs, and generated data."/>
-                        <Button Grid.Row="3"
-                                Grid.Column="2"
-                                Content="Open"
-                                Margin="0,8,0,0"
-                                Command="{Binding OpenAppDataCommand}"
-                                ToolTip="Open the app data folder."/>
+                                        <TextBlock Grid.Row="2"
+                                                   Text="VIIPER host"
+                                                   Margin="0,8,0,0"
+                                                   VerticalAlignment="Center"/>
+                                        <TextBox Grid.Row="2"
+                                                 Grid.Column="1"
+                                                 Grid.ColumnSpan="2"
+                                                 Margin="0,8,0,0"
+                                                 Text="{Binding ViiperHost, UpdateSourceTrigger=PropertyChanged}"
+                                                 ToolTip="Host name for a separately installed VIIPER server."/>
 
-                        <TextBlock Grid.Row="2"
-                                   Text="SRM manifest"
-                                   Margin="0,8,0,0"
-                                   VerticalAlignment="Center"/>
-                        <TextBox Grid.Row="2"
-                                 Grid.Column="1"
-                                 Margin="0,8,8,0"
-                                 Text="{Binding SrmManifestPath, UpdateSourceTrigger=PropertyChanged}"
-                                 ToolTip="Manifest JSON path used by your Steam ROM Manager parser."/>
-                        <Button Grid.Row="2"
-                                Grid.Column="2"
-                                Content="Export SRM"
-                                Margin="0,8,0,0"
-                                Command="{Binding ExportSrmManifestCommand}"
-                                ToolTip="Write the Steam ROM Manager manifest now."/>
+                                        <StackPanel Grid.Row="3"
+                                                    Orientation="Horizontal"
+                                                    Margin="0,8,0,0"
+                                                    VerticalAlignment="Center">
+                                                <TextBlock Text="VIIPER port"/>
+                                                <Ellipse Width="10"
+                                                         Height="10"
+                                                         Margin="6,0,0,0"
+                                                         Fill="{Binding ViiperStatusBrush}"
+                                                         Stroke="{Binding ViiperStatusBrush}"
+                                                         ToolTip="{Binding ViiperStatusToolTip}"/>
+                                        </StackPanel>
+                                        <TextBox Grid.Row="3"
+                                                 Grid.Column="1"
+                                                 Margin="0,8,8,0"
+                                                 InputScope="Number"
+                                                 Text="{Binding ViiperPort, UpdateSourceTrigger=PropertyChanged}"
+                                                 PreviewTextInput="BoardPort_PreviewTextInput"
+                                                 DataObject.Pasting="BoardPort_Pasting"
+                                                 ToolTip="Port for the VIIPER server API."/>
+                                        <Button Grid.Row="3"
+                                                Grid.Column="2"
+                                                Content="Check"
+                                                Margin="0,8,0,0"
+                                                Command="{Binding CheckViiperCommand}"
+                                                ToolTip="Check whether the configured VIIPER server is reachable."/>
+                                </Grid>
+                        </GroupBox>
 
-                        <TextBlock Grid.Row="4"
-                                   Text="Board firmware"
-                                   Margin="0,8,0,0"
-                                   VerticalAlignment="Center"/>
-                        <TextBlock Grid.Row="4"
-                                   Grid.Column="1"
-                                   Text="{Binding BoardFirmwareText}"
-                                   Margin="0,8,8,0"
-                                   VerticalAlignment="Center"
-                                   TextWrapping="Wrap"/>
-                        <Button Grid.Row="4"
-                                Grid.Column="2"
-                                Content="Flash"
-                                Margin="0,8,0,0"
-                                Command="{Binding UpdateFirmwareCommand}"
-                                ToolTip="Flash the board with the firmware bundled with this app."/>
+                        <GroupBox Header="App"
+                                  Margin="0,8,0,0">
+                                <Grid>
+                                        <Grid.RowDefinitions>
+                                                <RowDefinition Height="Auto"/>
+                                                <RowDefinition Height="Auto"/>
+                                                <RowDefinition Height="Auto"/>
+                                                <RowDefinition Height="Auto"/>
+                                        </Grid.RowDefinitions>
+                                        <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="120"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="132"/>
+                                        </Grid.ColumnDefinitions>
 
-                        <TextBlock Grid.Row="5"
-                                   Text="Version"
-                                   Margin="0,8,0,0"
-                                   VerticalAlignment="Center"/>
-                        <TextBlock Grid.Row="5"
-                                   Grid.Column="1"
-                                   Text="{Binding VersionText}"
-                                   Margin="0,8,8,0"
-                                   VerticalAlignment="Center"/>
-                        <Button Grid.Row="5"
-                                Grid.Column="2"
-                                Content="Check Updates"
-                                Margin="0,8,0,0"
-                                Command="{Binding CheckForUpdateCommand}"
-                                ToolTip="Check GitHub Releases for a newer version."/>
+                                        <TextBlock Text="Theme"
+                                                   VerticalAlignment="Center"/>
+                                        <ComboBox Grid.Column="1"
+                                                  Grid.ColumnSpan="2"
+                                                  ItemsSource="{Binding ThemeOptions}"
+                                                  SelectedItem="{Binding SelectedTheme}"
+                                                  ToolTip="Choose the app theme."/>
 
-                        <Button Grid.Row="6"
-                                Grid.Column="2"
-                                Content="Save"
-                                Margin="0,8,0,0"
-                                Command="{Binding SaveGeneralCommand}"
-                                ToolTip="Save app-wide settings and write the Steam ROM Manager manifest."/>
-                </Grid>
+                                        <TextBlock Grid.Row="1"
+                                                   Text="App data"
+                                                   Margin="0,8,0,0"
+                                                   VerticalAlignment="Center"/>
+                                        <TextBox Grid.Row="1"
+                                                 Grid.Column="1"
+                                                 Margin="0,8,8,0"
+                                                 Text="{Binding AppDataPath, Mode=OneWay}"
+                                                 IsReadOnly="True"
+                                                 ToolTip="Folder containing appsettings.json, logs, and generated data."/>
+                                        <Button Grid.Row="1"
+                                                Grid.Column="2"
+                                                Content="Open"
+                                                Margin="0,8,0,0"
+                                                Command="{Binding OpenAppDataCommand}"
+                                                ToolTip="Open the app data folder."/>
+
+                                        <TextBlock Grid.Row="2"
+                                                   Text="SRM manifest"
+                                                   Margin="0,8,0,0"
+                                                   VerticalAlignment="Center"/>
+                                        <TextBox Grid.Row="2"
+                                                 Grid.Column="1"
+                                                 Margin="0,8,8,0"
+                                                 Text="{Binding SrmManifestPath, UpdateSourceTrigger=PropertyChanged}"
+                                                 ToolTip="Manifest JSON path used by your Steam ROM Manager parser."/>
+                                        <Button Grid.Row="2"
+                                                Grid.Column="2"
+                                                Content="Export SRM"
+                                                Margin="0,8,0,0"
+                                                Command="{Binding ExportSrmManifestCommand}"
+                                                ToolTip="Write the Steam ROM Manager manifest now."/>
+
+                                        <TextBlock Grid.Row="3"
+                                                   Text="Version"
+                                                   Margin="0,8,0,0"
+                                                   VerticalAlignment="Center"/>
+                                        <TextBlock Grid.Row="3"
+                                                   Grid.Column="1"
+                                                   Text="{Binding VersionText}"
+                                                   Margin="0,8,8,0"
+                                                   VerticalAlignment="Center"/>
+                                        <Button Grid.Row="3"
+                                                Grid.Column="2"
+                                                Content="Check Updates"
+                                                Margin="0,8,0,0"
+                                                Command="{Binding CheckForUpdateCommand}"
+                                                ToolTip="Check GitHub Releases for a newer version."/>
+                                </Grid>
+                        </GroupBox>
+
+                        <StackPanel Orientation="Horizontal"
+                                    HorizontalAlignment="Right"
+                                    Margin="0,8,0,0">
+                                <TextBlock Text="{Binding SaveErrorText}"
+                                           Foreground="{Binding SaveErrorBrush}"
+                                           VerticalAlignment="Center"
+                                           Margin="0,0,8,0"/>
+                                <Button Content="Save"
+                                        FontWeight="{Binding SaveFontWeight}"
+                                        Command="{Binding SaveGeneralCommand}"
+                                        ToolTip="Save app-wide settings and write the Steam ROM Manager manifest."/>
+                        </StackPanel>
+                </StackPanel>
         </ScrollViewer>
 </UserControl>

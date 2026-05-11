@@ -4,7 +4,7 @@ using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace SteamHidBridge.App.Platform;
+namespace SteamHidBridge.App.Platform.Teensy;
 
 internal sealed class TeensyFirmwareUpdater
 {

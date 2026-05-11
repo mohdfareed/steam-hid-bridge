@@ -54,13 +54,12 @@ internal sealed class TrayIconHost : IDisposable
             return;
         }
 
+        window.ShowInTaskbar = true;
         window.Show();
         if (window.WindowState == WindowState.Minimized)
         {
             window.WindowState = WindowState.Normal;
         }
-
-        _ = window.Activate();
     }
 
     public void Dispose()

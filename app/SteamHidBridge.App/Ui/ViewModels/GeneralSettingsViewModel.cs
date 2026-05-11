@@ -2,8 +2,11 @@ using System;
 using System.IO;
 using System.Text.Json;
 using System.Threading.Tasks;
+using System.Windows;
 using System.Windows.Input;
+using System.Windows.Media;
 using SteamHidBridge.App.Configuration;
+using SteamHidBridge.App.Core;
 using SteamHidBridge.App.Platform;
 using SteamHidBridge.App.Platform.App;
 
@@ -13,37 +16,45 @@ internal sealed class GeneralSettingsViewModel : ObservableObject
 {
     private readonly BridgeAppService appService;
     private readonly Action<int?> applyBoardPort;
+    private readonly Action<string, int> applyViiperEndpoint;
     private readonly Action<AppTheme> applyTheme;
     private readonly Func<AppUpdateCheckResult, bool> confirmUpdate;
-    private string savedSrmManifestPath = string.Empty;
-    private string savedBoardPort = string.Empty;
     private AppTheme savedTheme;
-    private readonly AsyncRelayCommand saveGeneralCommand;
+    private string savedBoardPort = string.Empty;
+    private string savedViiperHost = string.Empty;
+    private string savedViiperPort = string.Empty;
+    private string savedSrmManifestPath = string.Empty;
 
     public GeneralSettingsViewModel(
         BridgeAppService appService,
         Action<int?> applyBoardPort,
+        Action<string, int> applyViiperEndpoint,
         Action<AppTheme> applyTheme,
         Func<AppUpdateCheckResult, bool> confirmUpdate)
     {
         this.appService = appService;
         this.applyBoardPort = applyBoardPort;
+        this.applyViiperEndpoint = applyViiperEndpoint;
         this.applyTheme = applyTheme;
         this.confirmUpdate = confirmUpdate;
 
-        saveGeneralCommand = new AsyncRelayCommand(SaveGeneralAsync, HasChanges);
-        SaveGeneralCommand = saveGeneralCommand;
+        SaveGeneralCommand = new AsyncRelayCommand(SaveGeneralAsync);
         ExportSrmManifestCommand = new AsyncRelayCommand(ExportSrmManifestAsync);
+        CheckViiperCommand = new AsyncRelayCommand(CheckViiperAsync);
         UpdateFirmwareCommand = new AsyncRelayCommand(UpdateFirmwareAsync);
         CheckForUpdateCommand = new AsyncRelayCommand(CheckForUpdateAsync);
         OpenAppDataCommand = new AsyncRelayCommand(OpenAppDataAsync);
 
         SrmManifestPath = appService.SrmManifestPath;
         BoardPort = appService.BoardPort?.ToString() ?? string.Empty;
+        ViiperHost = appService.ViiperHost;
+        ViiperPort = appService.ViiperPort.ToString();
         SelectedTheme = appService.Theme;
         savedTheme = SelectedTheme;
-        savedSrmManifestPath = SrmManifestPath.Trim();
         savedBoardPort = BoardPort.Trim();
+        savedViiperHost = ViiperHost.Trim();
+        savedViiperPort = ViiperPort.Trim();
+        savedSrmManifestPath = SrmManifestPath.Trim();
     }
 
     public event Action<int>? ExitRequested;
@@ -52,6 +63,7 @@ internal sealed class GeneralSettingsViewModel : ObservableObject
 
     public ICommand SaveGeneralCommand { get; }
     public ICommand ExportSrmManifestCommand { get; }
+    public ICommand CheckViiperCommand { get; }
     public ICommand UpdateFirmwareCommand { get; }
     public ICommand CheckForUpdateCommand { get; }
     public ICommand OpenAppDataCommand { get; }
@@ -61,6 +73,37 @@ internal sealed class GeneralSettingsViewModel : ObservableObject
     public string BoardFirmwareText => appService.HasBundledFirmware
         ? "Flash the packaged firmware to update the board."
         : "Firmware package is missing.";
+    public FontWeight SaveFontWeight => HasUnsavedChanges ? FontWeights.Bold : FontWeights.Normal;
+    public static Brush SaveErrorBrush => Brushes.IndianRed;
+    public Brush BoardStatusBrush
+    {
+        get;
+        private set => SetProperty(ref field, value);
+    } = Brushes.Gray;
+
+    public string BoardStatusToolTip
+    {
+        get;
+        private set => SetProperty(ref field, value);
+    } = "Not connected.";
+
+    public Brush ViiperStatusBrush
+    {
+        get;
+        private set => SetProperty(ref field, value);
+    } = Brushes.Gray;
+
+    public string ViiperStatusToolTip
+    {
+        get;
+        private set => SetProperty(ref field, value);
+    } = "Not checked yet.";
+
+    public string SaveErrorText
+    {
+        get;
+        private set => SetProperty(ref field, value);
+    } = string.Empty;
 
     public string SrmManifestPath
     {
@@ -69,7 +112,7 @@ internal sealed class GeneralSettingsViewModel : ObservableObject
         {
             if (SetProperty(ref field, value))
             {
-                saveGeneralCommand.RaiseCanExecuteChanged();
+                OnEditChanged();
             }
         }
     } = string.Empty;
@@ -81,7 +124,7 @@ internal sealed class GeneralSettingsViewModel : ObservableObject
         {
             if (SetProperty(ref field, value))
             {
-                saveGeneralCommand.RaiseCanExecuteChanged();
+                OnEditChanged();
             }
         }
     } = string.Empty;
@@ -94,33 +137,51 @@ internal sealed class GeneralSettingsViewModel : ObservableObject
             if (SetProperty(ref field, value))
             {
                 applyTheme(value);
-                saveGeneralCommand.RaiseCanExecuteChanged();
+                OnEditChanged();
             }
         }
     }
 
-    private bool HasChanges()
+    public string ViiperHost
     {
-        return savedTheme != SelectedTheme
-            || ParseBoardPort(savedBoardPort) != ParseBoardPort(BoardPort)
-            || !string.Equals(savedSrmManifestPath, SrmManifestPath.Trim(), StringComparison.Ordinal);
+        get;
+        set
+        {
+            if (SetProperty(ref field, value))
+            {
+                ResetViiperStatus();
+                OnEditChanged();
+            }
+        }
+    } = "localhost";
+
+    public string ViiperPort
+    {
+        get;
+        set
+        {
+            if (SetProperty(ref field, value))
+            {
+                ResetViiperStatus();
+                OnEditChanged();
+            }
+        }
+    } = "3242";
+
+    public void ApplySessionStatus(BridgeSessionStatus status)
+    {
+        ApplyBoardStatus(status.BoardOutput);
     }
 
     private Task SaveGeneralAsync()
     {
-        int? boardPortNumber = ParseBoardPort(BoardPort);
-        if (!string.IsNullOrWhiteSpace(BoardPort) && boardPortNumber is null)
+        if (!TryApplyGeneralSettings(out string? error))
         {
-            UserDialogs.ShowError("Board port must be a positive integer.");
+            SaveErrorText = error!;
             return Task.CompletedTask;
         }
 
-        appService.SaveGeneral(SelectedTheme, boardPortNumber, SrmManifestPath);
-        applyBoardPort(appService.BoardPort);
-        savedTheme = appService.Theme;
-        savedSrmManifestPath = SrmManifestPath.Trim();
-        savedBoardPort = BoardPort.Trim();
-        saveGeneralCommand.RaiseCanExecuteChanged();
+        SaveErrorText = string.Empty;
         return Task.CompletedTask;
     }
 
@@ -128,6 +189,13 @@ internal sealed class GeneralSettingsViewModel : ObservableObject
     {
         try
         {
+            if (!TryApplyGeneralSettings(out string? error))
+            {
+                SaveErrorText = error!;
+                return Task.CompletedTask;
+            }
+
+            SaveErrorText = string.Empty;
             appService.ExportSrmManifest();
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException or InvalidOperationException)
@@ -150,6 +218,29 @@ internal sealed class GeneralSettingsViewModel : ObservableObject
         }
 
         return Task.CompletedTask;
+    }
+
+    private async Task CheckViiperAsync()
+    {
+        string host = ViiperHost.Trim();
+        int? port = ParseRequiredPort(ViiperPort);
+        if (string.IsNullOrWhiteSpace(host) || port is null)
+        {
+            UserDialogs.ShowError("Enter a valid VIIPER host and port first.");
+            return;
+        }
+
+        try
+        {
+            await BridgeAppService.CheckViiperAsync(host, port.Value).ConfigureAwait(true);
+            ViiperStatusBrush = Brushes.SeaGreen;
+            ViiperStatusToolTip = $"Connected to {host}:{port.Value}.";
+        }
+        catch (Exception ex)
+        {
+            ViiperStatusBrush = Brushes.IndianRed;
+            ViiperStatusToolTip = $"Could not reach {host}:{port.Value}. {ex.Message}";
+        }
     }
 
     private async Task UpdateFirmwareAsync()
@@ -199,5 +290,104 @@ internal sealed class GeneralSettingsViewModel : ObservableObject
             : int.TryParse(trimmed, out int portNumber) && portNumber > 0
             ? portNumber
             : null;
+    }
+
+    private static int? ParseRequiredPort(string value)
+    {
+        string trimmed = value.Trim();
+        return int.TryParse(trimmed, out int portNumber) && portNumber > 0
+            ? portNumber
+            : null;
+    }
+
+    private void ResetViiperStatus()
+    {
+        ViiperStatusBrush = Brushes.Gray;
+        ViiperStatusToolTip = "Not checked yet.";
+    }
+
+    private bool TryApplyGeneralSettings(out string? error)
+    {
+        int? boardPortNumber = ParseBoardPort(BoardPort);
+        if (!string.IsNullOrWhiteSpace(BoardPort) && boardPortNumber is null)
+        {
+            error = "Board port must be a positive integer.";
+            return false;
+        }
+
+        string viiperHost = ViiperHost.Trim();
+        if (string.IsNullOrWhiteSpace(viiperHost))
+        {
+            error = "VIIPER host is required.";
+            return false;
+        }
+
+        int? viiperPortNumber = ParseRequiredPort(ViiperPort);
+        if (viiperPortNumber is null)
+        {
+            error = "VIIPER port must be a positive integer.";
+            return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(SrmManifestPath))
+        {
+            error = "SRM manifest path is required.";
+            return false;
+        }
+
+        appService.SaveGeneral(SelectedTheme, boardPortNumber, SrmManifestPath, viiperHost, viiperPortNumber.Value);
+        applyBoardPort(appService.BoardPort);
+        applyViiperEndpoint(appService.ViiperHost, appService.ViiperPort);
+        savedTheme = SelectedTheme;
+        savedBoardPort = BoardPort.Trim();
+        savedViiperHost = ViiperHost.Trim();
+        savedViiperPort = ViiperPort.Trim();
+        savedSrmManifestPath = SrmManifestPath.Trim();
+        OnPropertyChanged(nameof(SaveFontWeight));
+        error = null;
+        return true;
+    }
+
+    private void ApplyBoardStatus(OutputStatus status)
+    {
+        switch (status.State)
+        {
+            case OutputConnectionState.Connected:
+                BoardStatusBrush = Brushes.SeaGreen;
+                BoardStatusToolTip = string.IsNullOrWhiteSpace(status.Endpoint)
+                    ? "Connected."
+                    : $"Connected: {status.Endpoint}.";
+                break;
+            case OutputConnectionState.Error:
+            case OutputConnectionState.Disconnected:
+                BoardStatusBrush = Brushes.IndianRed;
+                BoardStatusToolTip = string.IsNullOrWhiteSpace(status.Endpoint)
+                    ? "Not connected."
+                    : $"Not connected: {status.Endpoint}.";
+                break;
+            case OutputConnectionState.Idle:
+                break;
+            default:
+                BoardStatusBrush = Brushes.Gray;
+                BoardStatusToolTip = "Not connected.";
+                break;
+        }
+    }
+
+    private bool HasUnsavedChanges =>
+        savedTheme != SelectedTheme
+        || !string.Equals(savedBoardPort, BoardPort.Trim(), StringComparison.Ordinal)
+        || !string.Equals(savedViiperHost, ViiperHost.Trim(), StringComparison.Ordinal)
+        || !string.Equals(savedViiperPort, ViiperPort.Trim(), StringComparison.Ordinal)
+        || !string.Equals(savedSrmManifestPath, SrmManifestPath.Trim(), StringComparison.Ordinal);
+
+    private void OnEditChanged()
+    {
+        if (!string.IsNullOrEmpty(SaveErrorText))
+        {
+            SaveErrorText = string.Empty;
+        }
+
+        OnPropertyChanged(nameof(SaveFontWeight));
     }
 }

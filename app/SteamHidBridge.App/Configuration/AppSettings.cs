@@ -29,7 +29,8 @@ internal static class AppSettingsFile
 
         try
         {
-            return JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(path), JsonOptions) ?? new();
+            AppSettings settings = JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(path), JsonOptions) ?? new();
+            return Normalize(settings);
         }
         catch (Exception ex) when (ex is JsonException or NotSupportedException)
         {
@@ -58,13 +59,12 @@ internal static class AppSettingsFile
             }
 
             AppSettings latest = File.Exists(path)
-                ? JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(path), JsonOptions) ?? new AppSettings()
+                ? Normalize(JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(path), JsonOptions) ?? new AppSettings())
                 : new AppSettings();
 
-            latest.General ??= new GeneralSettings();
-            latest.Games ??= [];
-            latest.General = settings.General;
-            latest.Games = settings.Games;
+            AppSettings normalized = Normalize(settings);
+            latest.General = normalized.General;
+            latest.Games = normalized.Games;
             WriteAtomic(path, latest);
         }
         finally
@@ -87,6 +87,35 @@ internal static class AppSettingsFile
         string tempPath = path + ".tmp";
         File.WriteAllText(tempPath, JsonSerializer.Serialize(settings, JsonOptions));
         File.Move(tempPath, path, overwrite: true);
+    }
+
+    private static AppSettings Normalize(AppSettings settings)
+    {
+        settings.General ??= new GeneralSettings();
+        settings.Games ??= [];
+
+        settings.General.SrmManifestPath = string.IsNullOrWhiteSpace(settings.General.SrmManifestPath)
+            ? AppDataPaths.SrmManifestPath
+            : FileSystemPath.Normalize(settings.General.SrmManifestPath);
+
+        if (string.IsNullOrWhiteSpace(settings.General.ViiperHost))
+        {
+            settings.General.ViiperHost = "localhost";
+        }
+
+        if (settings.General.ViiperPort <= 0)
+        {
+            settings.General.ViiperPort = 3242;
+        }
+
+        foreach (GameProfile profile in settings.Games.Values)
+        {
+            profile.Executable = FileSystemPath.Normalize(profile.Executable);
+            profile.WorkingDirectory = FileSystemPath.Normalize(profile.WorkingDirectory);
+            profile.ReceiverProcesses ??= [];
+        }
+
+        return settings;
     }
 
     private static string BuildMutexName(string path)

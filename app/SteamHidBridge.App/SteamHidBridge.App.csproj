@@ -23,6 +23,7 @@
 
   <ItemGroup>
     <PackageReference Include="System.IO.Ports" Version="10.*" />
+    <PackageReference Include="Viiper.Client" Version="*" />
     <ProjectReference Include="..\SteamHidBridge.Protocol\SteamHidBridge.Protocol.csproj" />
   </ItemGroup>
 

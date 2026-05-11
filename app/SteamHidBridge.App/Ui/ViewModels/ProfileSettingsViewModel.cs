@@ -6,7 +6,9 @@ using System.IO;
 using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
+using System.Windows;
 using System.Windows.Input;
+using System.Windows.Media;
 using SteamHidBridge.App.Configuration;
 using SteamHidBridge.App.Core;
 using SteamHidBridge.App.Platform.App;
@@ -19,7 +21,7 @@ internal sealed class ProfileSettingsViewModel : ObservableObject
 
     private readonly BridgeAppService appService;
     private readonly BridgeSession session;
-    private readonly string activeProfileId;
+    private string liveProfileId;
     private string selectedGameId = string.Empty;
     private string editGameId = string.Empty;
     private string editTitle = string.Empty;
@@ -31,19 +33,18 @@ internal sealed class ProfileSettingsViewModel : ObservableObject
     private string savedGameId = string.Empty;
     private GameProfile savedProfile = new();
     private bool isReloadingGameIds;
-    private readonly AsyncRelayCommand saveGameCommand;
+    private bool hasRunningLaunch;
     private readonly AsyncRelayCommand launchGameCommand;
 
     public ProfileSettingsViewModel(BridgeAppService appService, BridgeSession session, string activeProfileId)
     {
         this.appService = appService;
         this.session = session;
-        this.activeProfileId = activeProfileId.Trim();
+        liveProfileId = activeProfileId.Trim();
 
         NewGameCommand = new AsyncRelayCommand(NewGameAsync);
-        saveGameCommand = new AsyncRelayCommand(SaveGameAsync, CanSaveProfile);
+        SaveGameCommand = new AsyncRelayCommand(SaveGameAsync);
         launchGameCommand = new AsyncRelayCommand(LaunchGameAsync, CanSaveOrLaunchProfile);
-        SaveGameCommand = saveGameCommand;
         LaunchGameCommand = launchGameCommand;
 
         ReloadGameIds(activeProfileId);
@@ -54,7 +55,8 @@ internal sealed class ProfileSettingsViewModel : ObservableObject
     public ObservableCollection<SettingOption<BridgeOutputMode>> OutputModeOptions { get; } =
     [
         new(BridgeOutputMode.None, "None"),
-        new(BridgeOutputMode.Board, "Physical Mouse")
+        new(BridgeOutputMode.Board, "Physical Mouse"),
+        new(BridgeOutputMode.Viiper, "Virtual Mouse")
     ];
 
     public ICommand NewGameCommand { get; }
@@ -85,7 +87,8 @@ internal sealed class ProfileSettingsViewModel : ObservableObject
             if (SetProperty(ref editGameId, value))
             {
                 OnPropertyChanged(nameof(ProfileText));
-                RaiseCommandStateChanged();
+                OnEditChanged();
+                launchGameCommand.RaiseCanExecuteChanged();
             }
         }
     }
@@ -98,7 +101,7 @@ internal sealed class ProfileSettingsViewModel : ObservableObject
             if (SetProperty(ref editTitle, value))
             {
                 OnPropertyChanged(nameof(ProfileText));
-                RaiseCommandStateChanged();
+                OnEditChanged();
             }
         }
     }
@@ -110,7 +113,9 @@ internal sealed class ProfileSettingsViewModel : ObservableObject
         {
             if (SetProperty(ref editExecutable, value))
             {
-                RaiseCommandStateChanged();
+                SyncSessionProfileIfActive();
+                OnEditChanged();
+                launchGameCommand.RaiseCanExecuteChanged();
             }
         }
     }
@@ -122,7 +127,8 @@ internal sealed class ProfileSettingsViewModel : ObservableObject
         {
             if (SetProperty(ref editArguments, value))
             {
-                RaiseCommandStateChanged();
+                SyncSessionProfileIfActive();
+                OnEditChanged();
             }
         }
     }
@@ -134,7 +140,8 @@ internal sealed class ProfileSettingsViewModel : ObservableObject
         {
             if (SetProperty(ref editWorkingDirectory, value))
             {
-                RaiseCommandStateChanged();
+                SyncSessionProfileIfActive();
+                OnEditChanged();
             }
         }
     }
@@ -148,7 +155,7 @@ internal sealed class ProfileSettingsViewModel : ObservableObject
             {
                 OnPropertyChanged(nameof(ReceiverProcessesText));
                 SyncSessionProfileIfActive();
-                RaiseCommandStateChanged();
+                OnEditChanged();
             }
         }
     }
@@ -161,20 +168,45 @@ internal sealed class ProfileSettingsViewModel : ObservableObject
             if (SetProperty(ref selectedOutputMode, value))
             {
                 SyncSessionProfileIfActive();
-                RaiseCommandStateChanged();
+                OnEditChanged();
             }
         }
     }
 
     public string ProfileText => string.IsNullOrWhiteSpace(EditTitle) ? EditGameId : EditTitle;
-    public string ReceiverProcessesText => ReceiverProcesses.Length == 0 ? string.Empty : string.Join(", ", ReceiverProcesses);
+    public string ReceiverProcessesText => ExplicitReceiverProcesses.Length == 0 ? string.Empty : string.Join(", ", ExplicitReceiverProcesses);
+    public FontWeight SaveFontWeight => HasUnsavedChanges ? FontWeights.Bold : FontWeights.Normal;
+    public static Brush SaveErrorBrush => Brushes.IndianRed;
+
+    public string SaveErrorText
+    {
+        get;
+        private set => SetProperty(ref field, value);
+    } = string.Empty;
 
     public Task LaunchRequestedProfileAsync()
     {
-        return string.IsNullOrWhiteSpace(activeProfileId) ? Task.CompletedTask : LaunchGameAsync();
+        return string.IsNullOrWhiteSpace(liveProfileId) ? Task.CompletedTask : LaunchGameAsync();
     }
 
-    private string[] ReceiverProcesses => ParseReceiverProcesses(EditReceiverProcessesText);
+    public void ApplySessionStatus(BridgeSessionStatus status)
+    {
+        void Apply()
+        {
+            hasRunningLaunch = status.HasRunningLaunch;
+            launchGameCommand.RaiseCanExecuteChanged();
+        }
+
+        if (Application.Current.Dispatcher.CheckAccess())
+        {
+            Apply();
+            return;
+        }
+
+        _ = Application.Current.Dispatcher.BeginInvoke(Apply);
+    }
+
+    private string[] ExplicitReceiverProcesses => ParseReceiverProcesses(EditReceiverProcessesText);
 
     private Task NewGameAsync()
     {
@@ -186,9 +218,9 @@ internal sealed class ProfileSettingsViewModel : ObservableObject
 
     private Task SaveGameAsync()
     {
-        if (string.IsNullOrWhiteSpace(EditGameId))
+        if (!TryValidateProfile(out string? error))
         {
-            UserDialogs.ShowError("Cannot save without an id.");
+            SaveErrorText = error!;
             return Task.CompletedTask;
         }
 
@@ -196,11 +228,17 @@ internal sealed class ProfileSettingsViewModel : ObservableObject
         {
             string newId = EditGameId.Trim();
             appService.SaveProfile(selectedGameId, newId, ReadEditorProfile());
+            if (string.Equals(selectedGameId, liveProfileId, StringComparison.OrdinalIgnoreCase))
+            {
+                liveProfileId = newId;
+            }
+
+            SaveErrorText = string.Empty;
             ReloadGameIds(newId, appService.GetOrCreateProfile(newId));
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException or InvalidOperationException)
         {
-            UserDialogs.ShowError($"Save failed: {ex.Message}");
+            SaveErrorText = ex.Message;
         }
 
         return Task.CompletedTask;
@@ -214,6 +252,9 @@ internal sealed class ProfileSettingsViewModel : ObservableObject
         try
         {
             session.LaunchProfile();
+            liveProfileId = selectedGameId;
+            hasRunningLaunch = true;
+            launchGameCommand.RaiseCanExecuteChanged();
         }
         catch (Exception ex) when (ex is FileNotFoundException or InvalidOperationException or Win32Exception)
         {
@@ -225,25 +266,9 @@ internal sealed class ProfileSettingsViewModel : ObservableObject
 
     private bool CanSaveOrLaunchProfile()
     {
-        return !string.IsNullOrWhiteSpace(EditGameId)
+        return !hasRunningLaunch
+            && !string.IsNullOrWhiteSpace(EditGameId)
             && !string.IsNullOrWhiteSpace(EditExecutable);
-    }
-
-    private bool CanSaveProfile()
-    {
-        return CanSaveOrLaunchProfile() && HasProfileChanges();
-    }
-
-    private bool HasProfileChanges()
-    {
-        return !string.Equals(savedGameId, EditGameId.Trim(), StringComparison.Ordinal)
-            || !savedProfile.ContentEquals(ReadEditorProfile());
-    }
-
-    private void RaiseCommandStateChanged()
-    {
-        saveGameCommand.RaiseCanExecuteChanged();
-        launchGameCommand.RaiseCanExecuteChanged();
     }
 
     private void ReloadGameIds(string requestedId)
@@ -318,6 +343,7 @@ internal sealed class ProfileSettingsViewModel : ObservableObject
         editReceiverProcessesText = string.Join(" | ", profile.ReceiverProcesses);
         savedGameId = gameId;
         savedProfile = profile.Copy();
+        SaveErrorText = string.Empty;
         SyncSessionProfileIfActive();
 
         OnPropertyChanged(nameof(SelectedGameId));
@@ -330,13 +356,14 @@ internal sealed class ProfileSettingsViewModel : ObservableObject
         OnPropertyChanged(nameof(SelectedOutputMode));
         OnPropertyChanged(nameof(ProfileText));
         OnPropertyChanged(nameof(ReceiverProcessesText));
-        RaiseCommandStateChanged();
+        OnPropertyChanged(nameof(SaveFontWeight));
+        launchGameCommand.RaiseCanExecuteChanged();
     }
 
     private void SyncSessionProfileIfActive()
     {
-        if (!string.IsNullOrWhiteSpace(activeProfileId)
-            && string.Equals(selectedGameId, activeProfileId, StringComparison.OrdinalIgnoreCase))
+        if (!string.IsNullOrWhiteSpace(liveProfileId)
+            && string.Equals(selectedGameId, liveProfileId, StringComparison.OrdinalIgnoreCase))
         {
             session.SetOutputMode(SelectedOutputMode);
             session.SetProfile(ReadEditorProfile());
@@ -348,17 +375,53 @@ internal sealed class ProfileSettingsViewModel : ObservableObject
         return new GameProfile
         {
             Title = EditTitle.Trim(),
-            Executable = EditExecutable.Trim(),
+            Executable = FileSystemPath.Normalize(EditExecutable),
             Arguments = EditArguments,
-            WorkingDirectory = EditWorkingDirectory.Trim(),
+            WorkingDirectory = FileSystemPath.Normalize(EditWorkingDirectory),
             OutputMode = SelectedOutputMode,
-            ReceiverProcesses = [.. ReceiverProcesses]
+            ReceiverProcesses = [.. ExplicitReceiverProcesses]
         };
     }
 
-    private string[] ParseReceiverProcesses(string value)
+    private void OnEditChanged()
     {
-        string[] processes = value.Split('|', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        return processes.Length == 0 ? [EditExecutable.Trim()] : processes;
+        if (!string.IsNullOrEmpty(SaveErrorText))
+        {
+            SaveErrorText = string.Empty;
+        }
+
+        OnPropertyChanged(nameof(SaveFontWeight));
+    }
+
+    private bool HasUnsavedChanges =>
+        !string.Equals(savedGameId, EditGameId.Trim(), StringComparison.Ordinal)
+        || !savedProfile.ContentEquals(ReadEditorProfile());
+
+    private static bool TryValidateValue(string value)
+    {
+        return !string.IsNullOrWhiteSpace(value);
+    }
+
+    private bool TryValidateProfile(out string? error)
+    {
+        if (!TryValidateValue(EditGameId))
+        {
+            error = "Id is required.";
+            return false;
+        }
+
+        if (!TryValidateValue(EditExecutable))
+        {
+            error = "Executable is required.";
+            return false;
+        }
+
+        error = null;
+        return true;
+    }
+
+    private static string[] ParseReceiverProcesses(string value)
+    {
+        return value.Split('|', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
     }
 }

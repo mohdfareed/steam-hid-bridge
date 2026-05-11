@@ -6,14 +6,13 @@ namespace SteamHidBridge.App.Ui.ViewModels;
 
 internal sealed class OutputViewModel : ObservableObject
 {
-    private bool isForwardingActive;
     private HidInputReport lastReport;
 
-    public string ForwardingStatus
+    public string ForwardingText
     {
         get;
         private set => SetProperty(ref field, value);
-    } = "Forwarding off";
+    } = "off";
 
     public string OutputTargetText
     {
@@ -24,19 +23,22 @@ internal sealed class OutputViewModel : ObservableObject
     public string PointerText => $"dx {lastReport.PointerDeltaX}, dy {lastReport.PointerDeltaY}";
     public string WheelText => $"wheel {lastReport.VerticalWheel}";
     public string MouseButtonsText => lastReport.MouseButtons == MouseButtons.None ? "buttons none" : $"buttons {lastReport.MouseButtons}";
+    public string LastOutputText
+    {
+        get;
+        private set => SetProperty(ref field, value);
+    } = "No output yet";
     public string MouseLeftBrush => MouseButtonBrush(MouseButtons.Left);
     public string MouseRightBrush => MouseButtonBrush(MouseButtons.Right);
     public string MouseMiddleBrush => MouseButtonBrush(MouseButtons.Middle);
     public string MouseBackBrush => MouseButtonBrush(MouseButtons.Back);
     public string MouseForwardBrush => MouseButtonBrush(MouseButtons.Forward);
-    public string StatusBrush => isForwardingActive ? "SeaGreen" : "Gray";
 
     public void ApplyRuntimeStatus(BridgeSessionStatus status)
     {
-        isForwardingActive = status.ForwardingEnabled;
-        ForwardingStatus = status.ForwardingEnabled ? "Forwarding on" : "Forwarding off";
-        OutputTargetText = FormatOutputTarget(status.OutputMode, status.BoardOutput);
-        OnPropertyChanged(nameof(StatusBrush));
+        ForwardingText = status.ForwardingEnabled ? "on" : "off";
+        OutputTargetText = FormatOutputTarget(status.OutputMode, status.BoardOutput, status.ViiperOutput);
+        LastOutputText = FormatLastOutput(status.OutputMode, status.BoardOutput, status.ViiperOutput);
     }
 
     public void PreviewMouseInput(MouseInputFrame frame)
@@ -62,7 +64,7 @@ internal sealed class OutputViewModel : ObservableObject
         return lastReport.MouseButtons.HasFlag(button) ? "SeaGreen" : "White";
     }
 
-    private static string FormatOutputTarget(BridgeOutputMode outputMode, BoardOutputStatus boardStatus)
+    private static string FormatOutputTarget(BridgeOutputMode outputMode, OutputStatus boardStatus, OutputStatus viiperStatus)
     {
         return outputMode switch
         {
@@ -77,6 +79,7 @@ internal sealed class OutputViewModel : ObservableObject
                     OutputError.WriteFailed => string.IsNullOrWhiteSpace(boardStatus.Endpoint)
                         ? "Board error: write failed"
                         : $"Board error: {boardStatus.Endpoint}",
+                    OutputError.ConnectFailed => "Board error",
                     _ => "Board error"
                 },
                 OutputConnectionState.Disconnected => string.IsNullOrWhiteSpace(boardStatus.Endpoint)
@@ -85,7 +88,37 @@ internal sealed class OutputViewModel : ObservableObject
                 OutputConnectionState.Idle => "Board idle",
                 _ => "Board idle"
             },
+            BridgeOutputMode.Viiper => viiperStatus.State switch
+            {
+                OutputConnectionState.Connected => $"Virtual mouse connected: {viiperStatus.Endpoint}",
+                OutputConnectionState.Error => viiperStatus.Error switch
+                {
+                    OutputError.ConnectFailed => $"Virtual mouse unavailable: {viiperStatus.Endpoint}",
+                    OutputError.WriteFailed => $"Virtual mouse write failed: {viiperStatus.Endpoint}",
+                    OutputError.None => "Virtual mouse error",
+                    OutputError.FrameEncodeFailed => "Virtual mouse error",
+                    _ => "Virtual mouse error"
+                },
+                OutputConnectionState.Disconnected => $"Virtual mouse disconnected: {viiperStatus.Endpoint}",
+                OutputConnectionState.Idle => "Virtual mouse idle",
+                _ => "Virtual mouse idle"
+            },
             _ => "Unknown output"
         };
+    }
+
+    private static string FormatLastOutput(BridgeOutputMode outputMode, OutputStatus boardStatus, OutputStatus viiperStatus)
+    {
+        MouseInputFrame? frame = outputMode switch
+        {
+            BridgeOutputMode.Board => boardStatus.LastFrame,
+            BridgeOutputMode.Viiper => viiperStatus.LastFrame,
+            BridgeOutputMode.None => null,
+            _ => null
+        };
+
+        return frame is MouseInputFrame value
+            ? $"dx {value.PointerDeltaX}, dy {value.PointerDeltaY}, wheel {value.VerticalWheel}, buttons {(value.Buttons == MouseButtons.None ? "none" : value.Buttons)}"
+            : "No output yet";
     }
 }
