@@ -3,7 +3,7 @@ using System.ComponentModel;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Interop;
-using SteamHidBridge.App.Core.Input;
+using SteamHidBridge.App.Core;
 using SteamHidBridge.Protocol;
 
 namespace SteamHidBridge.App.Platform.Windows;

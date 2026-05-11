@@ -6,18 +6,16 @@ using System.Text.Json;
 
 namespace SteamHidBridge.App.Configuration;
 
-internal sealed record SrmManifestWriteResult(string Path, int ProfileCount);
-
-internal sealed class SrmManifestWriter(AppSettingsStore settingsStore)
+internal static class SrmManifestWriter
 {
-    public SrmManifestWriteResult Write(string configuredPath, string? bridgeExecutable)
+    public static void Write(AppSettings settings, string? bridgeExecutable)
     {
         if (string.IsNullOrWhiteSpace(bridgeExecutable))
         {
             throw new InvalidOperationException("Could not find bridge executable path.");
         }
 
-        string manifestPath = ExpandPath(configuredPath);
+        string manifestPath = ExpandPath(settings.General.SrmManifestPath);
         if (string.IsNullOrWhiteSpace(manifestPath))
         {
             throw new InvalidOperationException("Steam ROM Manager manifest path is empty.");
@@ -29,9 +27,8 @@ internal sealed class SrmManifestWriter(AppSettingsStore settingsStore)
             _ = Directory.CreateDirectory(directory);
         }
 
-        string json = SteamRomManagerExport.CreateJson(settingsStore.Document.Games, bridgeExecutable);
+        string json = SteamRomManagerExport.CreateJson(settings.Games, bridgeExecutable);
         File.WriteAllText(manifestPath, json);
-        return new SrmManifestWriteResult(manifestPath, settingsStore.Document.Games.Count);
     }
 
     private static string ExpandPath(string path)

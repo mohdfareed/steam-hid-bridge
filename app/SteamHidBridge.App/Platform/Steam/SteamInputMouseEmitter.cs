@@ -3,7 +3,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using SteamHidBridge.App.Core.Input;
+using SteamHidBridge.App.Core;
 using SteamHidBridge.Protocol;
 using Steamworks;
 

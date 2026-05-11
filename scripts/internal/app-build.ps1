@@ -18,7 +18,5 @@ function Invoke-DotNet {
 }
 
 Invoke-DotNet restore (Join-Path $root "app\SteamHidBridge.App\SteamHidBridge.App.csproj")
-
 Invoke-DotNet format (Join-Path $root "app\SteamHidBridge.App\SteamHidBridge.App.csproj") --no-restore
-
 Invoke-DotNet build (Join-Path $root "app\SteamHidBridge.App\SteamHidBridge.App.csproj") --configuration $Configuration --no-restore

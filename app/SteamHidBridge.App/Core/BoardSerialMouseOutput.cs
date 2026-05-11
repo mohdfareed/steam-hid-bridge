@@ -3,13 +3,11 @@ using System.Diagnostics;
 using System.IO;
 using System.IO.Ports;
 using System.Threading;
-using SteamHidBridge.App.Configuration;
-using SteamHidBridge.App.Core.Input;
 using SteamHidBridge.Protocol;
 
-namespace SteamHidBridge.App.Core.Output;
+namespace SteamHidBridge.App.Core;
 
-internal sealed class BoardSerialMouseOutput(int? configuredPortNumber) : IMouseInputConsumer, IOutputStatusProvider, IDisposable
+internal sealed class BoardSerialMouseOutput(int? configuredPortNumber) : IDisposable
 {
     private const int BaudRate = 115200;
     private static readonly TimeSpan ReconnectInterval = TimeSpan.FromSeconds(1);
@@ -22,7 +20,7 @@ internal sealed class BoardSerialMouseOutput(int? configuredPortNumber) : IMouse
     private int? configuredPortNumber = configuredPortNumber;
     private bool isDisposed;
 
-    public OutputStatus Status
+    public BoardOutputStatus Status
     {
         get
         {
@@ -33,7 +31,7 @@ internal sealed class BoardSerialMouseOutput(int? configuredPortNumber) : IMouse
         }
 
         private set;
-    } = new(BridgeOutputMode.Board, OutputConnectionState.Disconnected);
+    } = new(OutputConnectionState.Disconnected);
 
     public void SetPort(int? value)
     {
@@ -42,7 +40,7 @@ internal sealed class BoardSerialMouseOutput(int? configuredPortNumber) : IMouse
             configuredPortNumber = value;
             ClosePort();
             nextConnectAttempt = 0;
-            Status = new(BridgeOutputMode.Board, OutputConnectionState.Disconnected);
+            Status = new(OutputConnectionState.Disconnected);
         }
     }
 
@@ -82,19 +80,19 @@ internal sealed class BoardSerialMouseOutput(int? configuredPortNumber) : IMouse
             BridgeFrame bridgeFrame = new(BridgeCommand.HidInput, sequence++, payload);
             if (!bridgeFrame.TryWrite(frameBuffer, out int bytesWritten))
             {
-                Status = new(BridgeOutputMode.Board, OutputConnectionState.Error, Error: OutputError.FrameEncodeFailed);
+                Status = new(OutputConnectionState.Error, Error: OutputError.FrameEncodeFailed);
                 return;
             }
 
             try
             {
                 port.Write(frameBuffer, 0, bytesWritten);
-                Status = new(BridgeOutputMode.Board, OutputConnectionState.Connected, port.PortName);
+                Status = new(OutputConnectionState.Connected, port.PortName);
             }
             catch (Exception ex) when (ex is IOException or InvalidOperationException or TimeoutException or UnauthorizedAccessException)
             {
                 Trace.TraceError($"board-write-failed{Environment.NewLine}{ex}");
-                Status = new(BridgeOutputMode.Board, OutputConnectionState.Error, port.PortName, OutputError.WriteFailed);
+                Status = new(OutputConnectionState.Error, port.PortName, OutputError.WriteFailed);
                 ClosePort();
             }
         }
@@ -137,7 +135,7 @@ internal sealed class BoardSerialMouseOutput(int? configuredPortNumber) : IMouse
             {
                 port.Open();
                 serialPort = port;
-                Status = new(BridgeOutputMode.Board, OutputConnectionState.Connected, portName);
+                Status = new(OutputConnectionState.Connected, portName);
                 return serialPort;
             }
             catch (Exception ex) when (ex is IOException or InvalidOperationException or TimeoutException or UnauthorizedAccessException)
@@ -147,8 +145,8 @@ internal sealed class BoardSerialMouseOutput(int? configuredPortNumber) : IMouse
         }
 
         Status = configuredPortNumber is int portNumber
-            ? new OutputStatus(BridgeOutputMode.Board, OutputConnectionState.Disconnected, ToWindowsPortName(portNumber))
-            : new OutputStatus(BridgeOutputMode.Board, OutputConnectionState.Disconnected);
+            ? new BoardOutputStatus(OutputConnectionState.Disconnected, ToWindowsPortName(portNumber))
+            : new BoardOutputStatus(OutputConnectionState.Disconnected);
         return null;
     }
 

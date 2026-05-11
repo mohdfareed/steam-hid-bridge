@@ -5,7 +5,7 @@ using System.IO;
 using SteamHidBridge.App.Configuration;
 using SteamHidBridge.App.Platform.Windows;
 
-namespace SteamHidBridge.App.Core.Runtime;
+namespace SteamHidBridge.App.Core;
 
 internal sealed class GameProcessHost : IDisposable
 {

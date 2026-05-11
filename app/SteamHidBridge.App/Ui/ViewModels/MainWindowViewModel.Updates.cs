@@ -13,7 +13,7 @@ internal sealed partial class MainWindowViewModel
             AppUpdateCheckResult update = await appUpdater.CheckLatestAsync();
             if (!update.IsUpdateAvailable)
             {
-                ShowInfo($"Already on the latest release ({update.CurrentVersionText}).");
+                UserDialogs.ShowInfo($"Already on the latest release ({update.CurrentVersionText}).");
                 return;
             }
 
@@ -27,7 +27,7 @@ internal sealed partial class MainWindowViewModel
         }
         catch (Exception ex)
         {
-            ShowError($"Update check failed: {ex.Message}");
+            UserDialogs.ShowError($"Update check failed: {ex.Message}");
         }
     }
 }

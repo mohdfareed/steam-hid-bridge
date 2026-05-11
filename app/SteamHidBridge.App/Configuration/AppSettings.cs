@@ -8,57 +8,56 @@ using SteamHidBridge.App.Platform.App;
 
 namespace SteamHidBridge.App.Configuration;
 
-internal sealed class InvalidAppSettingsException(string path, string backupPath, Exception innerException)
-    : Exception($"The settings file at '{path}' was invalid and has been backed up to '{backupPath}'.", innerException)
-{
-    public string BackupPath { get; } = backupPath;
-}
-
-internal sealed class AppSettingsStore(string path, AppSettings document)
+internal static class AppSettingsFile
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
-        WriteIndented = true
+        WriteIndented = true,
+        Converters =
+        {
+            new System.Text.Json.Serialization.JsonStringEnumConverter(JsonNamingPolicy.CamelCase)
+        }
     };
 
-    static AppSettingsStore()
-    {
-        JsonOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter(JsonNamingPolicy.CamelCase));
-    }
-
-    public string FilePath { get; } = path;
-    public AppSettings Document { get; } = document;
-
-    public static AppSettingsStore CreateDefault()
-    {
-        return new AppSettingsStore(AppDataPaths.SettingsPath, Normalize(new AppSettings()));
-    }
-
-    public static AppSettingsStore LoadDefault()
+    public static AppSettings LoadDefault()
     {
         string path = AppDataPaths.SettingsPath;
         if (!File.Exists(path))
         {
-            return new AppSettingsStore(path, new AppSettings());
+            return new AppSettings();
         }
 
         try
         {
-            string json = File.ReadAllText(path);
-            AppSettings? document = JsonSerializer.Deserialize<AppSettings>(json, JsonOptions);
-            return new AppSettingsStore(path, Normalize(document));
+            AppSettings settings = JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(path), JsonOptions) ?? new AppSettings();
+            settings.General ??= new GeneralSettings();
+            settings.Games ??= [];
+            settings.General.SrmManifestPath = string.IsNullOrWhiteSpace(settings.General.SrmManifestPath)
+                ? AppDataPaths.SrmManifestPath
+                : settings.General.SrmManifestPath;
+
+            foreach (GameProfile game in settings.Games.Values)
+            {
+                game.ReceiverProcesses ??= [];
+            }
+
+            return settings;
         }
         catch (Exception ex) when (ex is JsonException or NotSupportedException)
         {
             string backupPath = BackupInvalidSettings(path);
-            throw new InvalidAppSettingsException(path, backupPath, ex);
+            throw new InvalidDataException(
+                $"The settings file was invalid and has been backed up.\n\nBackup:\n{backupPath}\n\nSteam HID Bridge started with empty settings.",
+                ex);
         }
     }
 
-    public void Save()
+    public static void SaveDefault(AppSettings settings)
     {
-        using Mutex mutex = new(false, BuildMutexName(FilePath));
+        string path = AppDataPaths.SettingsPath;
+        using Mutex mutex = new(false, BuildMutexName(path));
         bool lockTaken = false;
+
         try
         {
             try
@@ -70,15 +69,15 @@ internal sealed class AppSettingsStore(string path, AppSettings document)
                 lockTaken = true;
             }
 
-            AppSettings latest = LoadFromPath(FilePath);
-            latest.General = Document.General;
-            latest.Games.Clear();
-            foreach ((string gameId, GameProfile gameProfile) in Document.Games)
-            {
-                latest.Games[gameId] = gameProfile;
-            }
+            AppSettings latest = File.Exists(path)
+                ? JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(path), JsonOptions) ?? new AppSettings()
+                : new AppSettings();
 
-            WriteAtomic(FilePath, latest);
+            latest.General ??= new GeneralSettings();
+            latest.Games ??= [];
+            latest.General = settings.General;
+            latest.Games = settings.Games;
+            WriteAtomic(path, latest);
         }
         finally
         {
@@ -89,36 +88,7 @@ internal sealed class AppSettingsStore(string path, AppSettings document)
         }
     }
 
-    private static AppSettings LoadFromPath(string path)
-    {
-        if (!File.Exists(path))
-        {
-            return new AppSettings();
-        }
-
-        string json = File.ReadAllText(path);
-        return Normalize(JsonSerializer.Deserialize<AppSettings>(json, JsonOptions));
-    }
-
-    private static AppSettings Normalize(AppSettings? document)
-    {
-        document ??= new AppSettings();
-        document.General ??= new GeneralSettings();
-        if (string.IsNullOrWhiteSpace(document.General.SrmManifestPath))
-        {
-            document.General.SrmManifestPath = AppDataPaths.SrmManifestPath;
-        }
-
-        document.Games ??= [];
-        foreach (GameProfile game in document.Games.Values)
-        {
-            game.ReceiverProcesses ??= [];
-        }
-
-        return document;
-    }
-
-    private static void WriteAtomic(string path, AppSettings document)
+    private static void WriteAtomic(string path, AppSettings settings)
     {
         string? directory = Path.GetDirectoryName(path);
         if (!string.IsNullOrWhiteSpace(directory))
@@ -127,8 +97,7 @@ internal sealed class AppSettingsStore(string path, AppSettings document)
         }
 
         string tempPath = path + ".tmp";
-        string json = JsonSerializer.Serialize(document, JsonOptions);
-        File.WriteAllText(tempPath, json);
+        File.WriteAllText(tempPath, JsonSerializer.Serialize(settings, JsonOptions));
         File.Move(tempPath, path, overwrite: true);
     }
 
@@ -142,23 +111,19 @@ internal sealed class AppSettingsStore(string path, AppSettings document)
     private static string BackupInvalidSettings(string path)
     {
         string directory = Path.GetDirectoryName(path) ?? AppDataPaths.RootDirectory;
-        string fileNameWithoutExtension = Path.GetFileNameWithoutExtension(path);
+        string stem = Path.GetFileNameWithoutExtension(path);
         string extension = Path.GetExtension(path);
-        string backupPath = Path.Combine(
-            directory,
-            $"{fileNameWithoutExtension}.invalid-{DateTime.Now:yyyyMMdd-HHmmss}{extension}");
-
+        string timestamp = DateTime.Now.ToString("yyyyMMdd-HHmmss");
+        string backupPath = Path.Combine(directory, $"{stem}.invalid-{timestamp}{extension}");
         int suffix = 2;
+
         while (File.Exists(backupPath))
         {
-            backupPath = Path.Combine(
-                directory,
-                $"{fileNameWithoutExtension}.invalid-{DateTime.Now:yyyyMMdd-HHmmss}-{suffix}{extension}");
+            backupPath = Path.Combine(directory, $"{stem}.invalid-{timestamp}-{suffix}{extension}");
             suffix++;
         }
 
         File.Move(path, backupPath);
         return backupPath;
     }
-
 }

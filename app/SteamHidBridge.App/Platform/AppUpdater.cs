@@ -74,32 +74,19 @@ internal sealed class AppUpdater
     {
         string tempRoot = Path.Combine(Path.GetTempPath(), $"SteamHidBridgeUpdate-{Guid.NewGuid():N}");
         string tempScriptPath = Path.Combine(tempRoot, UpdaterAssetName);
-        string tempBootstrapPath = Path.Combine(tempRoot, "start-update.ps1");
         string tempCommandPath = Path.Combine(tempRoot, "start-update.cmd");
 
         string installDir = Path.TrimEndingDirectorySeparator(AppContext.BaseDirectory);
         _ = Directory.CreateDirectory(tempRoot);
         _ = Directory.CreateDirectory(AppDataPaths.LogDirectory);
         string logPath = AppDataPaths.UpdateLogPath;
-
-        File.WriteAllText(
-            tempBootstrapPath,
-            $"""
-                $ErrorActionPreference = "Stop"
-                Invoke-WebRequest -Uri {PowerShellQuote(update.UpdaterUrl)} -OutFile {PowerShellQuote(tempScriptPath)}
-                & {PowerShellQuote(tempScriptPath)} `
-                    -PackageUrl {PowerShellQuote(update.PackageUrl)} `
-                    -InstallDir {PowerShellQuote(installDir)} `
-                    -CurrentProcessId {Environment.ProcessId}
-            """);
-
-        string powerShellArguments = string.Join(
-            ' ',
-            "-NoProfile",
-            "-ExecutionPolicy",
-            "Bypass",
-            "-File",
-            CommandLineQuote(tempBootstrapPath));
+        string powerShellCommand =
+            $"$ErrorActionPreference='Stop'; " +
+            $"Invoke-WebRequest -Uri {PowerShellQuote(update.UpdaterUrl)} -OutFile {PowerShellQuote(tempScriptPath)}; " +
+            $"& {PowerShellQuote(tempScriptPath)} " +
+            $"-PackageUrl {PowerShellQuote(update.PackageUrl)} " +
+            $"-InstallDir {PowerShellQuote(installDir)} " +
+            $"-CurrentProcessId {Environment.ProcessId}";
 
         File.WriteAllText(
             tempCommandPath,
@@ -108,7 +95,7 @@ internal sealed class AppUpdater
                 echo Steam HID Bridge updater
                 echo Log: {logPath}
                 echo.
-                powershell.exe {powerShellArguments} > {CommandLineQuote(logPath)} 2>&1
+                powershell.exe -NoProfile -ExecutionPolicy Bypass -Command {CommandLineQuote(powerShellCommand)} > {CommandLineQuote(logPath)} 2>&1
                 set UPDATE_EXIT_CODE=%ERRORLEVEL%
                 type {CommandLineQuote(logPath)}
                 echo.

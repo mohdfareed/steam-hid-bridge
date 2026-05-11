@@ -1,29 +1,28 @@
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using SteamHidBridge.App.Configuration;
-using SteamHidBridge.App.Core.Input;
 using SteamHidBridge.App.Platform.App;
+using SteamHidBridge.App.Platform.Steam;
 using SteamHidBridge.App.Platform.Windows;
 
-namespace SteamHidBridge.App.Core.Runtime;
+namespace SteamHidBridge.App.Core;
 
 internal sealed record BridgeRuntimeStatus(
     bool ForwardingEnabled,
-    MouseInputStatistics Statistics,
     BridgeInputMode InputMode,
     InputSourceStatus InputStatus,
-    OutputStatus[] Outputs);
+    BridgeOutputMode OutputMode,
+    BoardOutputStatus BoardOutput);
 
 internal sealed class BridgeRuntime : IDisposable
 {
     private static readonly TimeSpan StatusInterval = TimeSpan.FromMilliseconds(250);
-    private readonly IOutputStatusProvider[] outputStatusProviders;
+    private readonly BoardSerialMouseOutput boardOutput;
     private readonly MouseInputRouter mouseInputRouter;
-    private readonly GameProcessHost gameProcessHost;
-    private readonly ForwardingGate forwardingGate;
+    private readonly GameProcessHost gameProcessHost = new();
+    private readonly SteamInputConfigForcer steamInputConfigForcer = new();
     private readonly CancellationTokenSource cancellation = new();
     private readonly Task statusTask;
     private readonly Lock syncLock = new();
@@ -31,17 +30,17 @@ internal sealed class BridgeRuntime : IDisposable
     private GameProfile profile = new();
     private bool isDisposed;
     private bool hasRequestedExit;
+    private bool hasSeenReceiverProcess;
+    private bool isForwarding;
     private BridgeInputMode inputMode = BridgeInputMode.LegacyMouse;
+    private BridgeOutputMode outputMode = BridgeOutputMode.Board;
     private InputSourceStatus inputStatus = new(InputSourceState.Inactive);
 
-    public BridgeRuntime(BridgeLaunchOptions launchOptions, IEnumerable<IMouseInputConsumer> forwardingConsumers)
+    public BridgeRuntime(BridgeLaunchOptions launchOptions, int? boardPort)
     {
         hasProfileLaunch = !string.IsNullOrWhiteSpace(launchOptions.ProfileId);
-        IMouseInputConsumer[] consumers = [.. forwardingConsumers];
-        outputStatusProviders = [.. consumers.OfType<IOutputStatusProvider>()];
-        gameProcessHost = new GameProcessHost();
-        forwardingGate = new ForwardingGate();
-        mouseInputRouter = new MouseInputRouter(OnMouseInput, consumers, () => forwardingGate.IsForwarding);
+        boardOutput = new BoardSerialMouseOutput(boardPort);
+        mouseInputRouter = new MouseInputRouter(OnMouseInput, ForwardMouseInput, () => isForwarding);
         statusTask = Task.Run(RunStatusLoopAsync);
     }
 
@@ -71,24 +70,37 @@ internal sealed class BridgeRuntime : IDisposable
         inputStatus = value == BridgeInputMode.SteamInputActions
             ? new InputSourceStatus(InputSourceState.Starting)
             : new InputSourceStatus(InputSourceState.Inactive);
-        RefreshStatus();
+        PublishStatus();
     }
 
     public void SetInputStatus(InputSourceStatus value)
     {
         inputStatus = value;
-        RefreshStatus();
+        PublishStatus();
+    }
+
+    public void SetOutputMode(BridgeOutputMode value)
+    {
+        outputMode = value;
+        PublishStatus();
+    }
+
+    public void SetBoardPort(int? value)
+    {
+        boardOutput.SetPort(value);
+        PublishStatus();
     }
 
     public void SetProfile(GameProfile value)
     {
         lock (syncLock)
         {
-            profile = CloneProfile(value);
-            forwardingGate.ResetProfile();
+            profile = value;
+            hasSeenReceiverProcess = false;
         }
 
-        RefreshStatus();
+        SetForwarding(false);
+        PublishStatus();
     }
 
     public void LaunchProfile()
@@ -124,7 +136,8 @@ internal sealed class BridgeRuntime : IDisposable
 
         gameProcessHost.Dispose();
         StopReceiverProcesses();
-        forwardingGate.Dispose();
+        steamInputConfigForcer.Reset();
+        boardOutput.Dispose();
         cancellation.Dispose();
     }
 
@@ -133,20 +146,20 @@ internal sealed class BridgeRuntime : IDisposable
         using PeriodicTimer timer = new(StatusInterval);
         while (await timer.WaitForNextTickAsync(cancellation.Token).ConfigureAwait(false))
         {
-            RefreshStatus();
+            Refresh();
         }
     }
 
-    private void RefreshStatus()
+    private void Refresh()
     {
         if (isDisposed)
         {
             return;
         }
 
-        foreach (IOutputStatusProvider provider in outputStatusProviders)
+        if (outputMode == BridgeOutputMode.Board)
         {
-            provider.Refresh();
+            boardOutput.Refresh();
         }
 
         string[] receivers;
@@ -157,36 +170,49 @@ internal sealed class BridgeRuntime : IDisposable
 
         if (receivers.Length == 0)
         {
-            PublishStatus(false);
+            SetForwarding(false);
             if (hasProfileLaunch && gameProcessHost.HasLaunchedProcess && gameProcessHost.HasExited)
             {
                 RequestExit();
+                return;
             }
 
+            PublishStatus();
             return;
         }
 
-        ForwardingGateResult gateResult = forwardingGate.Refresh(receivers, hasProfileLaunch);
-        if (gateResult.ReceiverExited)
+        bool receiverRunning = WindowsRuntime.IsAnyProcessRunning(receivers);
+        if (receiverRunning)
         {
+            hasSeenReceiverProcess = true;
+        }
+
+        if (hasProfileLaunch && hasSeenReceiverProcess && !receiverRunning)
+        {
+            SetForwarding(false);
             RequestExit();
             return;
         }
 
-        PublishStatus(gateResult.IsForwarding);
-
+        bool shouldForward = receiverRunning && IsReceiverProcess(WindowsRuntime.GetForegroundProcessName(), receivers);
+        SetForwarding(shouldForward);
+        PublishStatus();
     }
 
-    private void PublishStatus(bool forwardingEnabled)
+    private void PublishStatus()
     {
-        MouseInputStatistics statistics = mouseInputRouter.GetStatistics();
-
         StatusChanged?.Invoke(new BridgeRuntimeStatus(
-            forwardingEnabled,
-            statistics,
+            isForwarding,
             inputMode,
             inputStatus,
-            [.. outputStatusProviders.Select(static provider => provider.Status)]));
+            outputMode,
+            boardOutput.Status));
+    }
+
+    private void SetForwarding(bool value)
+    {
+        isForwarding = value;
+        _ = steamInputConfigForcer.TrySetForced(value);
     }
 
     private void RequestExit()
@@ -208,12 +234,10 @@ internal sealed class BridgeRuntime : IDisposable
             receivers = [.. profile.ReceiverProcesses];
         }
 
-        if (receivers.Length == 0)
+        if (receivers.Length > 0)
         {
-            return;
+            _ = WindowsRuntime.StopProcessesByName(receivers);
         }
-
-        _ = WindowsRuntime.StopProcessesByName(receivers);
     }
 
     private void OnMouseInput(MouseInputFrame frame)
@@ -221,18 +245,29 @@ internal sealed class BridgeRuntime : IDisposable
         MouseInput?.Invoke(frame);
     }
 
-    private static GameProfile CloneProfile(GameProfile profile)
+    private void ForwardMouseInput(MouseInputFrame frame)
     {
-        return new GameProfile
+        if (outputMode == BridgeOutputMode.Board)
         {
-            Title = profile.Title,
-            Executable = profile.Executable,
-            Arguments = profile.Arguments,
-            WorkingDirectory = profile.WorkingDirectory,
-            InputMode = profile.InputMode,
-            OutputMode = profile.OutputMode,
-            ReceiverProcesses = [.. profile.ReceiverProcesses]
-        };
+            boardOutput.Consume(frame);
+        }
     }
 
+    private static bool IsReceiverProcess(string processName, string[] receivers)
+    {
+        if (string.IsNullOrWhiteSpace(processName))
+        {
+            return false;
+        }
+
+        foreach (string receiver in receivers)
+        {
+            if (string.Equals(receiver, processName, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
 }

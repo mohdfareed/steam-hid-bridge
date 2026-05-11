@@ -15,7 +15,7 @@ internal sealed partial class MainWindowViewModel
     private Task NewGameAsync()
     {
         string gameId = CreateUniqueGameId();
-        settingsStore.Document.Games[gameId] = new GameProfile();
+        settings.Games[gameId] = new GameProfile();
         ReloadGameIds(gameId);
         return Task.CompletedTask;
     }
@@ -24,7 +24,7 @@ internal sealed partial class MainWindowViewModel
     {
         if (string.IsNullOrWhiteSpace(EditGameId))
         {
-            ShowError("Cannot save without an id.");
+            UserDialogs.ShowError("Cannot save without an id.");
             return Task.CompletedTask;
         }
 
@@ -34,19 +34,19 @@ internal sealed partial class MainWindowViewModel
         {
             if (!string.Equals(selectedGameId, newId, StringComparison.OrdinalIgnoreCase))
             {
-                _ = settingsStore.Document.Games.Remove(selectedGameId);
+                _ = settings.Games.Remove(selectedGameId);
             }
 
-            settingsStore.Document.Games[newId] = profile;
-            settingsStore.Save();
+            settings.Games[newId] = profile;
+            AppSettingsFile.SaveDefault(settings);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException or InvalidOperationException)
         {
-            ShowError($"Save failed: {ex.Message}");
+            UserDialogs.ShowError($"Save failed: {ex.Message}");
             return Task.CompletedTask;
         }
 
-        if (settingsStore.Document.Games.TryGetValue(newId, out GameProfile? savedProfile))
+        if (settings.Games.TryGetValue(newId, out GameProfile? savedProfile))
         {
             ReloadGameIds(newId, savedProfile);
         }
@@ -69,7 +69,7 @@ internal sealed partial class MainWindowViewModel
         }
         catch (Exception ex) when (ex is FileNotFoundException or InvalidOperationException or Win32Exception)
         {
-            ShowError(ex.Message);
+            UserDialogs.ShowError(ex.Message);
         }
 
         return Task.CompletedTask;
@@ -77,21 +77,21 @@ internal sealed partial class MainWindowViewModel
 
     private Task SaveGeneralAsync()
     {
-        int? boardPortNumber = ParseBoardPort(BoardPort);
+        int? boardPortNumber = MainWindowText.ParseBoardPort(BoardPort);
         if (!string.IsNullOrWhiteSpace(BoardPort) && boardPortNumber is null)
         {
-            ShowError("Board port must be a positive integer.");
+            UserDialogs.ShowError("Board port must be a positive integer.");
             return Task.CompletedTask;
         }
 
-        settingsStore.Document.General.Theme = SelectedTheme;
-        settingsStore.Document.General.BoardPort = boardPortNumber;
-        settingsStore.Document.General.SrmManifestPath = SrmManifestPath.Trim();
-        settingsStore.Save();
-        applyBoardPort(settingsStore.Document.General.BoardPort);
-        savedTheme = settingsStore.Document.General.Theme;
+        settings.General.Theme = SelectedTheme;
+        settings.General.BoardPort = boardPortNumber;
+        settings.General.SrmManifestPath = SrmManifestPath.Trim();
+        AppSettingsFile.SaveDefault(settings);
+        applyBoardPort(settings.General.BoardPort);
+        savedTheme = settings.General.Theme;
         savedBoardPort = BoardPort.Trim();
-        savedSrmManifestPath = settingsStore.Document.General.SrmManifestPath;
+        savedSrmManifestPath = settings.General.SrmManifestPath;
         saveGeneralCommand.RaiseCanExecuteChanged();
         _ = WriteSrmManifest();
 
@@ -113,7 +113,7 @@ internal sealed partial class MainWindowViewModel
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
         {
-            ShowError($"Could not open app data folder: {ex.Message}");
+            UserDialogs.ShowError($"Could not open app data folder: {ex.Message}");
         }
 
         return Task.CompletedTask;
@@ -123,13 +123,13 @@ internal sealed partial class MainWindowViewModel
     {
         try
         {
-            await boardFirmwareUpdater.UpdateAsync().ConfigureAwait(true);
-            ShowInfo("Board firmware update started.");
+            await teensyFirmwareUpdater.UpdateAsync().ConfigureAwait(true);
+            UserDialogs.ShowInfo("Board firmware update started.");
             OnPropertyChanged(nameof(BoardFirmwareText));
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
         {
-            ShowError($"Board firmware update failed to start: {ex.Message}");
+            UserDialogs.ShowError($"Board firmware update failed to start: {ex.Message}");
             OnPropertyChanged(nameof(BoardFirmwareText));
         }
     }
@@ -138,12 +138,12 @@ internal sealed partial class MainWindowViewModel
     {
         try
         {
-            _ = srmManifestWriter.Write(SrmManifestPath, Environment.ProcessPath);
+            SrmManifestWriter.Write(settings, Environment.ProcessPath);
             return true;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException or InvalidOperationException)
         {
-            ShowError($"Could not write Steam ROM Manager manifest: {ex.Message}");
+            UserDialogs.ShowError($"Could not write Steam ROM Manager manifest: {ex.Message}");
             return false;
         }
     }
@@ -151,10 +151,10 @@ internal sealed partial class MainWindowViewModel
     private void ReloadGameIds(string requestedId)
     {
         string selectedId = ResolveSelectedGameId(requestedId);
-        if (!settingsStore.Document.Games.TryGetValue(selectedId, out GameProfile? selectedProfile))
+        if (!settings.Games.TryGetValue(selectedId, out GameProfile? selectedProfile))
         {
             selectedProfile = new GameProfile();
-            settingsStore.Document.Games[selectedId] = selectedProfile;
+            settings.Games[selectedId] = selectedProfile;
         }
 
         ReloadGameIds(selectedId, selectedProfile);
@@ -177,7 +177,7 @@ internal sealed partial class MainWindowViewModel
 
     private void SyncGameIds()
     {
-        List<string> sortedGameIds = [.. settingsStore.Document.Games.Keys.Order(StringComparer.OrdinalIgnoreCase)];
+        List<string> sortedGameIds = [.. settings.Games.Keys.Order(StringComparer.OrdinalIgnoreCase)];
 
         for (int i = GameIds.Count - 1; i >= 0; i--)
         {
@@ -223,7 +223,7 @@ internal sealed partial class MainWindowViewModel
             return requestedId;
         }
 
-        foreach (string gameId in settingsStore.Document.Games.Keys.Order(StringComparer.OrdinalIgnoreCase))
+        foreach (string gameId in settings.Games.Keys.Order(StringComparer.OrdinalIgnoreCase))
         {
             return gameId;
         }
@@ -242,11 +242,11 @@ internal sealed partial class MainWindowViewModel
         selectedInputMode = profile.InputMode;
         selectedOutputMode = profile.OutputMode;
         editReceiverProcessesText = string.Join(" | ", profile.ReceiverProcesses);
-        srmManifestPath = settingsStore.Document.General.SrmManifestPath;
-        boardPort = settingsStore.Document.General.BoardPort?.ToString() ?? string.Empty;
-        selectedTheme = settingsStore.Document.General.Theme;
+        srmManifestPath = settings.General.SrmManifestPath;
+        boardPort = settings.General.BoardPort?.ToString() ?? string.Empty;
+        selectedTheme = settings.General.Theme;
         savedGameId = gameId;
-        savedProfile = CloneProfile(profile);
+        savedProfile = profile.Copy();
         savedSrmManifestPath = srmManifestPath;
         savedBoardPort = boardPort;
         savedTheme = selectedTheme;
@@ -313,43 +313,18 @@ internal sealed partial class MainWindowViewModel
     private string CreateUniqueGameId()
     {
         const string prefix = "new-game";
-        if (!settingsStore.Document.Games.ContainsKey(prefix))
+        if (!settings.Games.ContainsKey(prefix))
         {
             return prefix;
         }
 
         int suffix = 2;
-        while (settingsStore.Document.Games.ContainsKey($"{prefix}-{suffix}"))
+        while (settings.Games.ContainsKey($"{prefix}-{suffix}"))
         {
             suffix++;
         }
 
         return $"{prefix}-{suffix}";
-    }
-
-    private static GameProfile CloneProfile(GameProfile profile)
-    {
-        return new GameProfile
-        {
-            Title = profile.Title,
-            Executable = profile.Executable,
-            Arguments = profile.Arguments,
-            WorkingDirectory = profile.WorkingDirectory,
-            InputMode = profile.InputMode,
-            OutputMode = profile.OutputMode,
-            ReceiverProcesses = [.. profile.ReceiverProcesses]
-        };
-    }
-
-    private static bool ProfileEquals(GameProfile left, GameProfile right)
-    {
-        return string.Equals(left.Title, right.Title, StringComparison.Ordinal)
-            && string.Equals(left.Executable, right.Executable, StringComparison.Ordinal)
-            && string.Equals(left.Arguments, right.Arguments, StringComparison.Ordinal)
-            && string.Equals(left.WorkingDirectory, right.WorkingDirectory, StringComparison.Ordinal)
-            && left.InputMode == right.InputMode
-            && left.OutputMode == right.OutputMode
-            && left.ReceiverProcesses.SequenceEqual(right.ReceiverProcesses, StringComparer.Ordinal);
     }
 
 }

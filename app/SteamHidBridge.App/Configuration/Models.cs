@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 
 namespace SteamHidBridge.App.Configuration;
 
@@ -30,6 +31,31 @@ internal sealed class GameProfile
     public BridgeInputMode InputMode { get; set; } = BridgeInputMode.LegacyMouse;
     public BridgeOutputMode OutputMode { get; set; } = BridgeOutputMode.Board;
     public List<string> ReceiverProcesses { get; set; } = [];
+
+    public GameProfile Copy()
+    {
+        return new GameProfile
+        {
+            Title = Title,
+            Executable = Executable,
+            Arguments = Arguments,
+            WorkingDirectory = WorkingDirectory,
+            InputMode = InputMode,
+            OutputMode = OutputMode,
+            ReceiverProcesses = [.. ReceiverProcesses]
+        };
+    }
+
+    public bool ContentEquals(GameProfile other)
+    {
+        return Title == other.Title
+            && Executable == other.Executable
+            && Arguments == other.Arguments
+            && WorkingDirectory == other.WorkingDirectory
+            && InputMode == other.InputMode
+            && OutputMode == other.OutputMode
+            && ReceiverProcesses.SequenceEqual(other.ReceiverProcesses);
+    }
 }
 
 internal sealed class GeneralSettings

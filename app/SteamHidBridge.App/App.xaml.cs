@@ -5,8 +5,7 @@ using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Threading;
 using SteamHidBridge.App.Configuration;
-using SteamHidBridge.App.Core.Output;
-using SteamHidBridge.App.Core.Runtime;
+using SteamHidBridge.App.Core;
 using SteamHidBridge.App.Platform;
 using SteamHidBridge.App.Platform.App;
 using SteamHidBridge.App.Platform.Steam;
@@ -26,7 +25,6 @@ public partial class App : Application
     private TrayIconHost? trayIconHost;
     private MainWindowViewModel? mainWindowViewModel;
     private BridgeRuntime? bridgeRuntime;
-    private MouseOutputRouter? mouseOutputRouter;
     private SteamInputMouseEmitter? steamInputMouseEmitter;
     private ShutdownSignalListener? shutdownSignalListener;
     private RawMouseInputWindowHook? rawMouseInputWindowHook;
@@ -56,33 +54,49 @@ public partial class App : Application
             BridgeLaunchOptions launchOptions = BridgeLaunchOptions.Parse(e.Args);
             hideMainWindowToTrayOnClose = !string.IsNullOrWhiteSpace(launchOptions.ProfileId);
 
-            AppSettingsStore settingsStore;
             try
             {
-                settingsStore = AppSettingsStore.LoadDefault();
+                AppSettings settings = AppSettingsFile.LoadDefault();
+                AppThemeManager.Apply(settings.General.Theme);
+                ConfigureSteamLibraryPath();
+
+                bridgeRuntime = new BridgeRuntime(launchOptions, settings.General.BoardPort);
+                steamInputMouseEmitter = new SteamInputMouseEmitter(bridgeRuntime.PublishSteamInputMouseInput, bridgeRuntime.SetInputStatus);
+                mainWindowViewModel = new MainWindowViewModel(
+                    launchOptions,
+                    settings,
+                    bridgeRuntime,
+                        ApplyInputMode,
+                        bridgeRuntime.SetOutputMode,
+                        bridgeRuntime.SetBoardPort,
+                        AppThemeManager.Apply,
+                        ConfirmUpdate,
+                        action => Dispatcher.BeginInvoke(action));
             }
-            catch (InvalidAppSettingsException ex)
+            catch (InvalidDataException ex)
             {
-                settingsStore = AppSettingsStore.CreateDefault();
-                ShowSettingsRecoveryWarning(ex.BackupPath);
+                _ = MessageBox.Show(
+                    ex.Message,
+                    "Steam HID Bridge Settings Reset",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+                AppSettings settings = new();
+                AppThemeManager.Apply(settings.General.Theme);
+                ConfigureSteamLibraryPath();
+
+                bridgeRuntime = new BridgeRuntime(launchOptions, settings.General.BoardPort);
+                steamInputMouseEmitter = new SteamInputMouseEmitter(bridgeRuntime.PublishSteamInputMouseInput, bridgeRuntime.SetInputStatus);
+                mainWindowViewModel = new MainWindowViewModel(
+                    launchOptions,
+                    settings,
+                    bridgeRuntime,
+                        ApplyInputMode,
+                        bridgeRuntime.SetOutputMode,
+                        bridgeRuntime.SetBoardPort,
+                        AppThemeManager.Apply,
+                        ConfirmUpdate,
+                        action => Dispatcher.BeginInvoke(action));
             }
-
-            AppThemeManager.Apply(settingsStore.Document.General.Theme);
-            ConfigureSteamLibraryPath();
-
-            mouseOutputRouter = new MouseOutputRouter(BridgeOutputMode.Board, settingsStore.Document.General.BoardPort);
-            bridgeRuntime = new BridgeRuntime(launchOptions, [mouseOutputRouter]);
-            steamInputMouseEmitter = new SteamInputMouseEmitter(bridgeRuntime.PublishSteamInputMouseInput, bridgeRuntime.SetInputStatus);
-            mainWindowViewModel = new MainWindowViewModel(
-                launchOptions,
-                settingsStore,
-                bridgeRuntime,
-                    ApplyInputMode,
-                    mouseOutputRouter.SetMode,
-                    mouseOutputRouter.SetBoardPort,
-                    AppThemeManager.Apply,
-                    ConfirmUpdate,
-                    action => Dispatcher.BeginInvoke(action));
 
             mainWindowViewModel.ExitRequested += ExitApplication;
             shutdownSignalListener = new ShutdownSignalListener(() => Dispatcher.BeginInvoke(() => ExitApplication(0)));
@@ -124,7 +138,6 @@ public partial class App : Application
         isExiting = true;
 
         bridgeRuntime?.Dispose();
-        mouseOutputRouter?.Dispose();
         steamInputMouseEmitter?.Dispose();
         trayIconHost?.Dispose();
         shutdownSignalListener?.Dispose();
@@ -203,15 +216,6 @@ public partial class App : Application
             "Steam HID Bridge",
             MessageBoxButton.OK,
             MessageBoxImage.Error);
-    }
-
-    private static void ShowSettingsRecoveryWarning(string backupPath)
-    {
-        _ = MessageBox.Show(
-            $"The settings file was invalid and has been backed up.\n\nBackup:\n{backupPath}\n\nSteam HID Bridge started with empty settings.",
-            "Steam HID Bridge Settings Reset",
-            MessageBoxButton.OK,
-            MessageBoxImage.Warning);
     }
 
     private static bool ConfirmUpdate(AppUpdateCheckResult update)

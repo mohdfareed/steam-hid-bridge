@@ -1,31 +1,31 @@
-using SteamHidBridge.App.Configuration;
+using System;
 using SteamHidBridge.Protocol;
 
-namespace SteamHidBridge.App.Core.Input;
+namespace SteamHidBridge.App.Core;
 
-internal interface IMouseInputConsumer
+internal sealed class MouseInputRouter(
+    Action<MouseInputFrame> previewFrame,
+    Action<MouseInputFrame> forwardingConsumer,
+    Func<bool> isForwardingEnabled)
 {
-    void Consume(MouseInputFrame frame);
+    public void Publish(MouseInputFrame frame)
+    {
+        if (isForwardingEnabled())
+        {
+            forwardingConsumer(frame);
+        }
+
+        previewFrame(frame);
+    }
 }
 
-internal interface IOutputStatusProvider
-{
-    OutputStatus Status { get; }
-
-    void Refresh();
-}
+// Models
 
 internal readonly record struct MouseInputFrame(
     short PointerDeltaX,
     short PointerDeltaY,
     sbyte VerticalWheel,
     MouseButtons Buttons);
-
-internal sealed record MouseInputStatistics(
-    long EventCount,
-    long PreviewCount,
-    double EventsPerSecond,
-    double PreviewFramesPerSecond);
 
 internal enum InputSourceState
 {
@@ -56,8 +56,7 @@ internal enum OutputError
     UnknownMode
 }
 
-internal readonly record struct OutputStatus(
-    BridgeOutputMode Mode,
+internal readonly record struct BoardOutputStatus(
     OutputConnectionState State,
     string? Endpoint = null,
     OutputError Error = OutputError.None);

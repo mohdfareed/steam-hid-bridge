@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace SteamHidBridge.App.Platform.Board;
 
-internal sealed class BoardFirmwareUpdater
+internal sealed class TeensyFirmwareUpdater
 {
     private const string FirmwareFileName = "SteamHidBridge.Board";
     private readonly string firmwareDirectory = Path.Combine(AppContext.BaseDirectory, "Firmware");
