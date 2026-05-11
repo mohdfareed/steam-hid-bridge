@@ -76,7 +76,6 @@ try {
     }
 
     Write-Host "Installed Steam HID Bridge $($release.tag_name)."
-    Write-Host "Settings: $([IO.Path]::Combine([Environment]::GetFolderPath('LocalApplicationData'), 'SteamHidBridge', 'appsettings.json'))"
 } finally {
     if (Test-Path $tempRoot) {
         Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue

@@ -15,7 +15,7 @@ Steam Input remains the configuration layer; this project handles profile launch
   * Foreground gating such that input is only sent when the game is active.
   * Steam Input configurations to reliably activate when the game is active.
 * Reads mouse events from either Steam's virtual mouse output or Steam Input game actions.
-* Forwards mouse events to a selected output mode: none, physical board HID, or the packaged virtual mouse driver.
+* Forwards mouse events to a physical board over serial, emulating a physical mouse HID device.
 * Consistent shortcuts allows for Steam Cloud sync of Steam Input configurations (*undocumented/unreliable*).
 
 ## Install
@@ -32,7 +32,7 @@ Default install location:
 %LOCALAPPDATA%\Programs\SteamHidBridge
 ```
 
-The app can check GitHub Releases for updates from its App section. Updating closes all bridge instances and replaces the self-contained app folder with the latest release package.
+> The app can check GitHub Releases for updates from its App section. Updating closes all bridge instances and replaces the self-contained app folder with the latest release package.
 
 User data is stored outside the install folder:
 
@@ -44,8 +44,8 @@ User data is stored outside the install folder:
 Run the app directly:
 
 ```powershell
+dotnet run --project .\app\SteamHidBridge.App
 dotnet run --project .\app\SteamHidBridge.App -- --profile game-profile
-dotnet run --project .\app\SteamHidBridge.App -- --profile game-profile --launch
 ```
 
 ## Steam Use
@@ -66,8 +66,6 @@ dotnet run --project .\app\SteamHidBridge.App -- --profile game-profile --launch
 app/        Windows bridge application
 protocol/   Host-device frame and HID report payloads
 firmware/   Board firmware; current target is Teensy 4.0
-driver/     VHF/KMDF virtual mouse driver package
-tests/      Protocol tests
 scripts/    Build, check, publish, release, install helpers
 ```
 
@@ -76,24 +74,23 @@ scripts/    Build, check, publish, release, install helpers
 Prerequisites:
 
 - Latest stable .NET SDK that supports the target framework.
-- Visual Studio C++ and WDK components for the virtual driver.
-- PlatformIO CLI for firmware build/upload. The VS Code PlatformIO extension works after it has created its local CLI environment.
+- PlatformIO CLI for firmware build/upload.
+  - The VS Code PlatformIO extension works after it has created its local CLI environment.
 
 ```powershell
 .\scripts\check.ps1
 .\scripts\publish.ps1
 ```
 
-`check.ps1` verifies formatting, builds the app/protocol projects, runs tests, builds the virtual driver, and builds the board firmware.
-`publish.ps1` creates a self-contained single-file Windows app under `artifacts/SteamHidBridge-win-x64` and includes `Driver`, `Firmware`, and `Steam` artifacts.
+`check.ps1` verifies formatting, builds the app/protocol projects, and builds the board firmware.
+`publish.ps1` creates a self-contained single-file Windows app under `artifacts/SteamHidBridge-win-x64`.
 `release.ps1` creates the release zip at `artifacts/SteamHidBridge-win-x64.zip`.
 `release.ps1 -TagRelease` runs the release checks, creates a version tag, and pushes it to trigger the release workflow.
 
 Firmware build/upload:
 
 ```powershell
-pio run -d .\firmware\SteamHidBridge.Firmware
-pio run -d .\firmware\SteamHidBridge.Firmware -t upload
+pio run -d .\firmware\SteamHidBridge.Firmware [-t upload]
 ```
 
 ## Releases
@@ -105,4 +102,4 @@ Run the release script from a clean working tree:
 ```
 
 It prints the latest version tag, prompts for the next version, formats the solution, verifies the tree is still clean, builds, tests, packages, then creates and pushes a `vMAJOR.MINOR.PATCH` tag.
-The tag push triggers the release workflow, which builds, tests, packages `SteamHidBridge-win-x64.zip`, and attaches it to the GitHub Release.
+The tag push triggers the release workflow, which builds, packages `SteamHidBridge-win-x64.zip`, and attaches it to the GitHub Release.

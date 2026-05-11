@@ -30,6 +30,7 @@ public sealed class SteamInputMouseEmitter(Action<MouseInputFrame> publishFrame,
     private InputDigitalActionHandle_t wheelUp;
     private InputDigitalActionHandle_t wheelDown;
     private string statusText = "Steam Input inactive.";
+    private bool statusIsError;
 
     public string StatusText
     {
@@ -260,11 +261,12 @@ public sealed class SteamInputMouseEmitter(Action<MouseInputFrame> publishFrame,
         bool changed;
         lock (syncLock)
         {
-            changed = !string.Equals(statusText, value, StringComparison.Ordinal);
+            changed = !string.Equals(statusText, value, StringComparison.Ordinal) || statusIsError != isError;
             statusText = value;
+            statusIsError = isError;
         }
 
-        if (changed || isError)
+        if (changed)
         {
             publishStatus(value, isError);
         }

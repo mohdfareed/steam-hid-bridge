@@ -238,9 +238,7 @@ public sealed partial class MainWindowViewModel
         savedSrmManifestPath = srmManifestPath;
         savedBoardPort = boardPort;
         savedTheme = selectedTheme;
-        applyInputMode(selectedInputMode);
-        applyOutputMode(selectedOutputMode);
-        runtime.SetProfile(gameId, profile);
+        SyncRuntimeProfileIfActive(updateInputMode: true, updateOutputMode: true);
 
         OnPropertyChanged(nameof(SelectedGameId));
         OnPropertyChanged(nameof(EditGameId));
@@ -258,6 +256,32 @@ public sealed partial class MainWindowViewModel
         OnPropertyChanged(nameof(ReceiverProcessesText));
         RaiseProfileCommandStateChanged();
         saveGeneralCommand.RaiseCanExecuteChanged();
+    }
+
+    private bool IsActiveProfileSelected()
+    {
+        return !string.IsNullOrWhiteSpace(activeProfileId)
+            && string.Equals(selectedGameId, activeProfileId, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private void SyncRuntimeProfileIfActive(bool updateInputMode = false, bool updateOutputMode = false)
+    {
+        if (!IsActiveProfileSelected())
+        {
+            return;
+        }
+
+        runtime.SetProfile(selectedGameId, ReadEditorProfile());
+
+        if (updateInputMode)
+        {
+            applyInputMode(selectedInputMode);
+        }
+
+        if (updateOutputMode)
+        {
+            applyOutputMode(selectedOutputMode);
+        }
     }
 
     private GameProfile ReadEditorProfile()

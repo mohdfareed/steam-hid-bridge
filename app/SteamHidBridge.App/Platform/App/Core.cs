@@ -5,12 +5,11 @@ using System.Windows.Input;
 
 namespace SteamHidBridge.App.Platform.App;
 
-public sealed record BridgeLaunchOptions(string ProfileId, bool LaunchGame)
+public sealed record BridgeLaunchOptions(string ProfileId)
 {
     public static BridgeLaunchOptions Parse(string[] args)
     {
         string profileId = string.Empty;
-        bool launchGame = false;
 
         for (int index = 0; index < args.Length; index++)
         {
@@ -26,14 +25,9 @@ public sealed record BridgeLaunchOptions(string ProfileId, bool LaunchGame)
                 profileId = profileValue.Trim();
                 continue;
             }
-
-            if (string.Equals(args[index], "--launch", StringComparison.OrdinalIgnoreCase))
-            {
-                launchGame = true;
-            }
         }
 
-        return new BridgeLaunchOptions(profileId, launchGame);
+        return new BridgeLaunchOptions(profileId);
     }
 
     private static bool TryReadValue(string arg, string prefix, out string value)

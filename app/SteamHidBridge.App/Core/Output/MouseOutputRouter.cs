@@ -9,7 +9,6 @@ public sealed class MouseOutputRouter(BridgeOutputMode outputMode, string boardP
 {
     private readonly Lock syncLock = new();
     private readonly BoardSerialMouseOutput boardOutput = new(boardPort);
-    private readonly VirtualMouseDriverOutput driverOutput = new();
     private BridgeOutputMode outputMode = outputMode;
     private bool isDisposed;
 
@@ -23,7 +22,6 @@ public sealed class MouseOutputRouter(BridgeOutputMode outputMode, string boardP
                 {
                     BridgeOutputMode.None => "Visualize only",
                     BridgeOutputMode.Board => boardOutput.StatusText,
-                    BridgeOutputMode.VirtualMouse => driverOutput.StatusText,
                     _ => "Unknown output mode"
                 };
             }
@@ -57,9 +55,6 @@ public sealed class MouseOutputRouter(BridgeOutputMode outputMode, string boardP
                 case BridgeOutputMode.Board:
                     boardOutput.Refresh();
                     break;
-                case BridgeOutputMode.VirtualMouse:
-                    driverOutput.Refresh();
-                    break;
             }
         }
     }
@@ -78,9 +73,6 @@ public sealed class MouseOutputRouter(BridgeOutputMode outputMode, string boardP
                 case BridgeOutputMode.Board:
                     boardOutput.Consume(frame);
                     break;
-                case BridgeOutputMode.VirtualMouse:
-                    driverOutput.Consume(frame);
-                    break;
             }
         }
     }
@@ -91,7 +83,6 @@ public sealed class MouseOutputRouter(BridgeOutputMode outputMode, string boardP
         {
             isDisposed = true;
             boardOutput.Dispose();
-            driverOutput.Dispose();
         }
     }
 }

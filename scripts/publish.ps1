@@ -12,11 +12,6 @@ if (Test-Path $output) {
     Remove-Item -LiteralPath $output -Recurse -Force
 }
 
-$oldDriverStaging = Join-Path $root "artifacts\driver"
-if (Test-Path $oldDriverStaging) {
-    Remove-Item -LiteralPath $oldDriverStaging -Recurse -Force
-}
-
 $publishArgs = @(
     "publish",
     "$root\app\SteamHidBridge.App\SteamHidBridge.App.csproj",
@@ -38,17 +33,6 @@ if (-not [string]::IsNullOrWhiteSpace($Version)) {
 
 dotnet @publishArgs
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-
-& (Join-Path $root "scripts\internal\driver-build.ps1") -Configuration $Configuration -Platform x64
-
-$driverSource = Join-Path $root "driver\SteamHidBridge.VirtualMouse\obj\x64\$Configuration"
-$driverDest = Join-Path $output "Driver"
-New-Item -ItemType Directory -Force -Path $driverDest | Out-Null
-
-Copy-Item -LiteralPath (Join-Path $driverSource "SteamHidBridge.VirtualMouse.inf") -Destination $driverDest -Force
-Copy-Item -LiteralPath (Join-Path $driverSource "SteamHidBridge.VirtualMouse.sys") -Destination $driverDest -Force
-Copy-Item -LiteralPath (Join-Path $driverSource "steamhidbridge.virtualmouse.cat") -Destination (Join-Path $driverDest "SteamHidBridge.VirtualMouse.cat") -Force
-Copy-Item -LiteralPath (Join-Path $root "scripts\internal\driver-install.ps1") -Destination (Join-Path $driverDest "install.ps1") -Force
 
 & (Join-Path $root "scripts\internal\firmware-build.ps1") -Environment teensy40
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

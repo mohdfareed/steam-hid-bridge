@@ -13,9 +13,7 @@ function Invoke-DotNet {
 }
 
 Invoke-DotNet restore (Join-Path $root "app\SteamHidBridge.App\SteamHidBridge.App.csproj")
-Invoke-DotNet restore (Join-Path $root "protocol\SteamHidBridge.Protocol.Tests\SteamHidBridge.Protocol.Tests.csproj")
 
 Invoke-DotNet format (Join-Path $root "app\SteamHidBridge.App\SteamHidBridge.App.csproj") --verify-no-changes --no-restore
-Invoke-DotNet format (Join-Path $root "protocol\SteamHidBridge.Protocol.Tests\SteamHidBridge.Protocol.Tests.csproj") --verify-no-changes --no-restore
 
 Invoke-DotNet build (Join-Path $root "app\SteamHidBridge.App\SteamHidBridge.App.csproj") --configuration $Configuration --no-restore

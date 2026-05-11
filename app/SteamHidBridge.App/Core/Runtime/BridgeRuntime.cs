@@ -28,6 +28,7 @@ public sealed class BridgeRuntime : IDisposable
     private readonly CancellationTokenSource cancellation = new();
     private readonly Task statusTask;
     private readonly Lock syncLock = new();
+    private readonly bool hasProfileLaunch;
     private string profileId = "";
     private GameProfile profile = new();
     private bool isDisposed;
@@ -38,6 +39,7 @@ public sealed class BridgeRuntime : IDisposable
     public BridgeRuntime(BridgeLaunchOptions launchOptions, IEnumerable<IMouseInputConsumer> forwardingConsumers)
     {
         this.launchOptions = launchOptions;
+        hasProfileLaunch = !string.IsNullOrWhiteSpace(launchOptions.ProfileId);
         IMouseInputConsumer[] consumers = [.. forwardingConsumers];
         outputStatusProviders = [.. consumers.OfType<IOutputStatusProvider>()];
         gameProcessHost = new GameProcessHost(SetActivity);
@@ -71,7 +73,7 @@ public sealed class BridgeRuntime : IDisposable
     {
         inputMode = value;
         inputSourceText = value == BridgeInputMode.LegacyMouse
-            ? "Virtual Mouse active."
+            ? "Virtual mouse observer active."
             : "Steam Input actions active.";
         RefreshStatus();
     }
@@ -94,7 +96,7 @@ public sealed class BridgeRuntime : IDisposable
         lock (syncLock)
         {
             profileId = id;
-            profile = value;
+            profile = CloneProfile(value);
             forwardingGate.ResetProfile();
         }
 
@@ -171,7 +173,7 @@ public sealed class BridgeRuntime : IDisposable
         if (receivers.Length == 0)
         {
             PublishStatus("Forwarding off");
-            if (launchOptions.LaunchGame && gameProcessHost.HasLaunchedProcess && gameProcessHost.HasExited)
+            if (hasProfileLaunch && gameProcessHost.HasLaunchedProcess && gameProcessHost.HasExited)
             {
                 RequestExit("Launched process exited; closing bridge.");
             }
@@ -179,7 +181,7 @@ public sealed class BridgeRuntime : IDisposable
             return;
         }
 
-        ForwardingGateResult gateResult = forwardingGate.Refresh(receivers, launchOptions.LaunchGame);
+        ForwardingGateResult gateResult = forwardingGate.Refresh(receivers, hasProfileLaunch);
         if (gateResult.ReceiverExited)
         {
             RequestExit("Receiver process exited; closing bridge.");
@@ -253,6 +255,20 @@ public sealed class BridgeRuntime : IDisposable
     private void OnMouseInput(MouseInputFrame frame)
     {
         MouseInput?.Invoke(frame);
+    }
+
+    private static GameProfile CloneProfile(GameProfile profile)
+    {
+        return new GameProfile
+        {
+            Title = profile.Title,
+            Executable = profile.Executable,
+            Arguments = profile.Arguments,
+            WorkingDirectory = profile.WorkingDirectory,
+            InputMode = profile.InputMode,
+            OutputMode = profile.OutputMode,
+            ReceiverProcesses = [.. profile.ReceiverProcesses]
+        };
     }
 
     private string BuildOutputTargetText()

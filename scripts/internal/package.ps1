@@ -21,11 +21,6 @@ if (-not [string]::IsNullOrWhiteSpace($Version)) {
     Set-Content -LiteralPath (Join-Path $publishDir "VERSION") -Value $Version -Encoding utf8
 }
 
-$devSteamAppId = Join-Path $publishDir "steam_appid.txt"
-if (Test-Path $devSteamAppId) {
-    Remove-Item -LiteralPath $devSteamAppId -Force
-}
-
 Compress-Archive -Path (Join-Path $publishDir "*") -DestinationPath $packagePath -CompressionLevel Optimal
 Copy-Item -LiteralPath (Join-Path $root "scripts\internal\update.ps1") -Destination $updaterPath -Force
 Write-Host "Packaged to $packagePath"

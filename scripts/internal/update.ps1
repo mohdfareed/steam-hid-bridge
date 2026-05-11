@@ -11,7 +11,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$processNames = @("SteamHidBridge", "SteamHidBridge.App")
+$processName = "SteamHidBridge"
 $assetName = "SteamHidBridge-win-x64.zip"
 $signalName = "Local\SteamHidBridge.ShutdownForUpdate"
 $tempRoot = Join-Path ([IO.Path]::GetTempPath()) ("SteamHidBridgeUpdate-" + [guid]::NewGuid())
@@ -19,10 +19,8 @@ $zipPath = Join-Path $tempRoot $assetName
 $extractPath = Join-Path $tempRoot "package"
 
 function Get-BridgeProcesses {
-    foreach ($processName in $processNames) {
-        Get-Process -Name $processName -ErrorAction SilentlyContinue |
-        Where-Object { $_.Id -ne $PID }
-    }
+    Get-Process -Name $processName -ErrorAction SilentlyContinue |
+    Where-Object { $_.Id -ne $PID }
 }
 
 function Wait-ForBridgeExit {
@@ -65,7 +63,6 @@ try {
     Remove-Item -Recurse -Force
 
     Copy-Item -Path (Join-Path $extractPath "*") -Destination $InstallDir -Recurse -Force
-
     Write-Host "Steam HID Bridge updated."
 }
 finally {

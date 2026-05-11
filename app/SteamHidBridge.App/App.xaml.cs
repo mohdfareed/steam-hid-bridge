@@ -42,8 +42,8 @@ public partial class App : Application
             AppLog.Write($"startup args=[{string.Join(" ", e.Args.Select(arg => "\"" + arg + "\""))}] base={AppContext.BaseDirectory}");
 
             BridgeLaunchOptions launchOptions = BridgeLaunchOptions.Parse(e.Args);
-            hideMainWindowToTrayOnClose = launchOptions.LaunchGame;
-            AppLog.Write($"launch-options profile={launchOptions.ProfileId} launchGame={launchOptions.LaunchGame}");
+            hideMainWindowToTrayOnClose = !string.IsNullOrWhiteSpace(launchOptions.ProfileId);
+            AppLog.Write($"launch-options profile={launchOptions.ProfileId}");
 
             AppSettingsLoadResult settingsLoad = AppSettingsStore.LoadDefault();
             AppSettingsStore settingsStore = settingsLoad.Store;
@@ -84,11 +84,11 @@ public partial class App : Application
                 ShowSettingsRecoveryWarning(settingsLoad.WarningMessage);
             }
 
-            if (launchOptions.LaunchGame)
+            if (!string.IsNullOrWhiteSpace(launchOptions.ProfileId))
             {
                 window.Show();
                 window.Hide();
-                AppLog.Write("main-window hidden for launch mode");
+                AppLog.Write("main-window hidden for profile launch");
             }
             else
             {
@@ -141,6 +141,12 @@ public partial class App : Application
         }
     }
 
+    private void ApplyInputMode(BridgeInputMode inputMode)
+    {
+        bridgeRuntime?.SetInputMode(inputMode);
+        steamInputMouseEmitter?.SetEnabled(inputMode == BridgeInputMode.SteamInputActions);
+    }
+
     private void ExitApplication(int exitCode)
     {
         if (!Dispatcher.CheckAccess())
@@ -156,12 +162,6 @@ public partial class App : Application
 
         isExiting = true;
         Shutdown(exitCode);
-    }
-
-    private void ApplyInputMode(BridgeInputMode inputMode)
-    {
-        bridgeRuntime?.SetInputMode(inputMode);
-        steamInputMouseEmitter?.SetEnabled(inputMode == BridgeInputMode.SteamInputActions);
     }
 
     private void OnDispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)

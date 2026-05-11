@@ -18,8 +18,7 @@ public enum BridgeInputMode
 public enum BridgeOutputMode
 {
     None,
-    Board,
-    VirtualMouse
+    Board
 }
 
 public sealed class GameProfile

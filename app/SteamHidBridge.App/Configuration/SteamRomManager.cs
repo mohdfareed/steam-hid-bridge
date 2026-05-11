@@ -71,7 +71,7 @@ public static class SteamRomManagerExport
                 Title: GetTitle(id, profile),
                 Target: bridgeExecutable,
                 StartIn: startIn,
-                LaunchOptions: $"--profile {QuoteArgument(id)} --launch",
+                LaunchOptions: $"--profile {QuoteArgument(id)}",
                 AppendArgsToExecutable: false));
         }
 

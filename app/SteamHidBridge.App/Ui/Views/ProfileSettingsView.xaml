@@ -116,16 +116,7 @@
                 DisplayMemberPath="Label"
                 SelectedValuePath="Value"
                 SelectedValue="{Binding SelectedOutputMode}"
-                ToolTip="Choose no output or board physical mouse output. The virtual mouse driver is disabled while still in development.">
-        <ComboBox.ItemContainerStyle>
-          <Style TargetType="ComboBoxItem">
-            <Setter Property="IsEnabled"
-                    Value="{Binding IsEnabled}"/>
-            <Setter Property="ToolTip"
-                    Value="{Binding ToolTip}"/>
-          </Style>
-        </ComboBox.ItemContainerStyle>
-      </ComboBox>
+                ToolTip="Choose no output or board physical mouse output."/>
 
       <TextBlock Grid.Row="8"
                  Text="Receivers *"

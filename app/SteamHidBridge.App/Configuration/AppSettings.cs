@@ -138,12 +138,7 @@ public sealed class AppSettingsStore(string path, AppSettings document)
 
             if (!Enum.IsDefined(game.OutputMode))
             {
-                game.OutputMode = BridgeOutputMode.Board;
-            }
-            else if (game.OutputMode == BridgeOutputMode.VirtualMouse)
-            {
-                // TODO: Remove when driver is fully developed
-                game.OutputMode = BridgeOutputMode.Board;
+                game.OutputMode = BridgeOutputMode.None;
             }
 
             game.ReceiverProcesses ??= [];

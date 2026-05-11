@@ -15,7 +15,7 @@ namespace SteamHidBridge.App.Ui.ViewModels;
 
 public sealed partial class MainWindowViewModel : INotifyPropertyChanged
 {
-    public sealed record SettingOption<T>(T Value, string Label, bool IsEnabled = true, string ToolTip = "");
+    public sealed record SettingOption<T>(T Value, string Label);
 
     private readonly BridgeLaunchOptions launchOptions;
     private readonly AppSettingsStore settingsStore;
@@ -103,13 +103,9 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         SetActivity($"Ready. profile={selectedGameId}");
         AppLog.Write($"settings={settingsStore.FilePath}");
 
-        if (launchOptions.LaunchGame && !string.IsNullOrWhiteSpace(launchOptions.ProfileId))
+        if (!string.IsNullOrWhiteSpace(launchOptions.ProfileId))
         {
             _ = LaunchGameAsync();
-        }
-        else if (launchOptions.LaunchGame)
-        {
-            SetError("Launch mode requires --profile <id>.");
         }
     }
 
@@ -126,8 +122,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     public ObservableCollection<SettingOption<BridgeOutputMode>> OutputModeOptions { get; } =
     [
         new(BridgeOutputMode.None, "None"),
-        new(BridgeOutputMode.Board, "Physical Mouse"),
-        new(BridgeOutputMode.VirtualMouse, "Virtual Mouse", false, "Disabled while the virtual mouse driver is still in development.")
+        new(BridgeOutputMode.Board, "Physical Mouse")
     ];
     public ICommand NewGameCommand { get; }
     public ICommand SaveGameCommand { get; }
@@ -229,7 +224,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
             if (SetProperty(ref editReceiverProcessesText, value))
             {
                 OnPropertyChanged(nameof(ReceiverProcessesText));
-                runtime.SetProfile(selectedGameId, ReadEditorProfile());
+                SyncRuntimeProfileIfActive();
                 RaiseProfileCommandStateChanged();
             }
         }
@@ -263,6 +258,19 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         }
     }
 
+    public BridgeInputMode SelectedInputMode
+    {
+        get => selectedInputMode;
+        set
+        {
+            if (SetProperty(ref selectedInputMode, value))
+            {
+                SyncRuntimeProfileIfActive(updateInputMode: true);
+                RaiseProfileCommandStateChanged();
+            }
+        }
+    }
+
     public AppTheme SelectedTheme
     {
         get => selectedTheme;
@@ -276,19 +284,6 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         }
     }
 
-    public BridgeInputMode SelectedInputMode
-    {
-        get => selectedInputMode;
-        set
-        {
-            if (SetProperty(ref selectedInputMode, value))
-            {
-                applyInputMode(value);
-                RaiseProfileCommandStateChanged();
-            }
-        }
-    }
-
     public BridgeOutputMode SelectedOutputMode
     {
         get => selectedOutputMode;
@@ -296,7 +291,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         {
             if (SetProperty(ref selectedOutputMode, value))
             {
-                applyOutputMode(value);
+                SyncRuntimeProfileIfActive(updateOutputMode: true);
                 RaiseProfileCommandStateChanged();
             }
         }
