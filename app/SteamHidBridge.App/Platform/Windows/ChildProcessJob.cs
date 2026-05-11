@@ -2,11 +2,10 @@ using System;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
-using SteamHidBridge.App.Platform.App;
 
 namespace SteamHidBridge.App.Platform.Windows;
 
-public sealed partial class ChildProcessJob : IDisposable
+internal sealed partial class ChildProcessJob : IDisposable
 {
     private IntPtr handle;
     private bool disposed;
@@ -42,18 +41,7 @@ public sealed partial class ChildProcessJob : IDisposable
 
     public bool TryAdd(Process process)
     {
-        if (disposed || process.HasExited)
-        {
-            return false;
-        }
-
-        if (AssignProcessToJobObject(handle, process.Handle))
-        {
-            return true;
-        }
-
-        AppLog.Write($"job-assign-failed pid={process.Id} error={Marshal.GetLastPInvokeError()}");
-        return false;
+        return !disposed && !process.HasExited && AssignProcessToJobObject(handle, process.Handle);
     }
 
     public void Dispose()

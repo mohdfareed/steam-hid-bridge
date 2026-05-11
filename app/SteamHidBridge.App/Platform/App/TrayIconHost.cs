@@ -6,7 +6,7 @@ using Forms = System.Windows.Forms;
 
 namespace SteamHidBridge.App.Platform.App;
 
-public sealed class TrayIconHost : IDisposable
+internal sealed class TrayIconHost : IDisposable
 {
     private readonly MainWindow window;
     private readonly Action exit;

@@ -1,3 +1,8 @@
+<#
+.SYNOPSIS
+Publishes the Windows app and copies bundled firmware artifacts into the publish folder.
+#>
+
 param(
     [string]$Configuration = "Release",
     [string]$Runtime = "win-x64",
@@ -37,7 +42,7 @@ if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 & (Join-Path $root "scripts\internal\firmware-build.ps1") -Environment teensy40
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-$firmwareSource = Join-Path $root "firmware\SteamHidBridge.Firmware\.pio\build\teensy40\firmware.hex"
+$firmwareSource = Join-Path $root "firmware\.pio\build\teensy40\firmware.hex"
 $firmwareDest = Join-Path $output "Firmware"
 New-Item -ItemType Directory -Force -Path $firmwareDest | Out-Null
 Copy-Item -LiteralPath $firmwareSource -Destination (Join-Path $firmwareDest "SteamHidBridge.Board.hex") -Force

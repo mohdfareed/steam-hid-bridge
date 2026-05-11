@@ -1,3 +1,8 @@
+<#
+.SYNOPSIS
+Runs the local release gate, then creates and pushes a version tag.
+#>
+
 param(
     [string] $Runtime = "win-x64"
 )

@@ -5,14 +5,14 @@ using SteamHidBridge.App.Core.Input;
 
 namespace SteamHidBridge.App.Core.Output;
 
-public sealed class MouseOutputRouter(BridgeOutputMode outputMode, string boardPort) : IMouseInputConsumer, IOutputStatusProvider, IDisposable
+internal sealed class MouseOutputRouter(BridgeOutputMode outputMode, int? boardPort) : IMouseInputConsumer, IOutputStatusProvider, IDisposable
 {
     private readonly Lock syncLock = new();
     private readonly BoardSerialMouseOutput boardOutput = new(boardPort);
     private BridgeOutputMode outputMode = outputMode;
     private bool isDisposed;
 
-    public string StatusText
+    public OutputStatus Status
     {
         get
         {
@@ -20,9 +20,9 @@ public sealed class MouseOutputRouter(BridgeOutputMode outputMode, string boardP
             {
                 return outputMode switch
                 {
-                    BridgeOutputMode.None => "Visualize only",
-                    BridgeOutputMode.Board => boardOutput.StatusText,
-                    _ => "Unknown output mode"
+                    BridgeOutputMode.None => new OutputStatus(BridgeOutputMode.None, OutputConnectionState.Idle),
+                    BridgeOutputMode.Board => boardOutput.Status,
+                    _ => new OutputStatus(BridgeOutputMode.None, OutputConnectionState.Error, Error: OutputError.UnknownMode)
                 };
             }
         }
@@ -36,7 +36,7 @@ public sealed class MouseOutputRouter(BridgeOutputMode outputMode, string boardP
         }
     }
 
-    public void SetBoardPort(string value)
+    public void SetBoardPort(int? value)
     {
         boardOutput.SetPort(value);
     }
@@ -55,6 +55,10 @@ public sealed class MouseOutputRouter(BridgeOutputMode outputMode, string boardP
                 case BridgeOutputMode.Board:
                     boardOutput.Refresh();
                     break;
+                case BridgeOutputMode.None:
+                    break;
+                default:
+                    break;
             }
         }
     }
@@ -72,6 +76,10 @@ public sealed class MouseOutputRouter(BridgeOutputMode outputMode, string boardP
             {
                 case BridgeOutputMode.Board:
                     boardOutput.Consume(frame);
+                    break;
+                case BridgeOutputMode.None:
+                    break;
+                default:
                     break;
             }
         }

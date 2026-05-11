@@ -1,5 +1,7 @@
 using System;
-using System.Linq;
+using System.Diagnostics;
+using System.IO;
+using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Threading;
 using SteamHidBridge.App.Configuration;
@@ -16,6 +18,9 @@ using SteamHidBridge.App.Ui.Views;
 
 namespace SteamHidBridge.App;
 
+/// <summary>
+/// Starts and owns the WPF application lifetime for Steam HID Bridge.
+/// </summary>
 public partial class App : Application
 {
     private TrayIconHost? trayIconHost;
@@ -28,28 +33,42 @@ public partial class App : Application
     private bool hideMainWindowToTrayOnClose;
     private bool isExiting;
 
+    /// <summary>
+    /// Initializes the application object and subscribes to top-level exception handlers.
+    /// </summary>
     public App()
     {
         DispatcherUnhandledException += OnDispatcherUnhandledException;
         AppDomain.CurrentDomain.UnhandledException += OnUnhandledException;
     }
 
+    /// <summary>
+    /// Builds the runtime graph and shows the main window or tray-hosted profile instance.
+    /// </summary>
+    /// <param name="e">The startup event arguments.</param>
     protected override void OnStartup(StartupEventArgs e)
     {
         try
         {
             base.OnStartup(e);
-            AppLog.Write($"startup args=[{string.Join(" ", e.Args.Select(arg => "\"" + arg + "\""))}] base={AppContext.BaseDirectory}");
+            ConfigureLogging();
 
             BridgeLaunchOptions launchOptions = BridgeLaunchOptions.Parse(e.Args);
             hideMainWindowToTrayOnClose = !string.IsNullOrWhiteSpace(launchOptions.ProfileId);
-            AppLog.Write($"launch-options profile={launchOptions.ProfileId}");
 
-            AppSettingsLoadResult settingsLoad = AppSettingsStore.LoadDefault();
-            AppSettingsStore settingsStore = settingsLoad.Store;
-            AppLog.Write($"settings loaded path={settingsStore.FilePath}");
+            AppSettingsStore settingsStore;
+            try
+            {
+                settingsStore = AppSettingsStore.LoadDefault();
+            }
+            catch (InvalidAppSettingsException ex)
+            {
+                settingsStore = AppSettingsStore.CreateDefault();
+                ShowSettingsRecoveryWarning(ex.BackupPath);
+            }
+
             AppThemeManager.Apply(settingsStore.Document.General.Theme);
-            SteamNativeLibraryPath.Configure();
+            ConfigureSteamLibraryPath();
 
             mouseOutputRouter = new MouseOutputRouter(BridgeOutputMode.Board, settingsStore.Document.General.BoardPort);
             bridgeRuntime = new BridgeRuntime(launchOptions, [mouseOutputRouter]);
@@ -58,12 +77,12 @@ public partial class App : Application
                 launchOptions,
                 settingsStore,
                 bridgeRuntime,
-                ApplyInputMode,
-                mouseOutputRouter.SetMode,
-                mouseOutputRouter.SetBoardPort,
-                AppThemeManager.Apply,
-                ConfirmUpdate,
-                action => Dispatcher.BeginInvoke(action));
+                    ApplyInputMode,
+                    mouseOutputRouter.SetMode,
+                    mouseOutputRouter.SetBoardPort,
+                    AppThemeManager.Apply,
+                    ConfirmUpdate,
+                    action => Dispatcher.BeginInvoke(action));
 
             mainWindowViewModel.ExitRequested += ExitApplication;
             shutdownSignalListener = new ShutdownSignalListener(() => Dispatcher.BeginInvoke(() => ExitApplication(0)));
@@ -74,27 +93,19 @@ public partial class App : Application
             };
 
             window.Closing += OnMainWindowClosing;
-            window.Closed += (_, _) => AppLog.Write("main-window closed");
             MainWindow = window;
 
             trayIconHost = new TrayIconHost(window, mainWindowViewModel.TrayText, () => ExitApplication(0));
             rawMouseInputWindowHook = new RawMouseInputWindowHook(window, bridgeRuntime.PublishLegacyMouseInput);
-            if (!string.IsNullOrWhiteSpace(settingsLoad.WarningMessage))
-            {
-                ShowSettingsRecoveryWarning(settingsLoad.WarningMessage);
-            }
-
             if (!string.IsNullOrWhiteSpace(launchOptions.ProfileId))
             {
                 window.Show();
                 window.Hide();
-                AppLog.Write("main-window hidden for profile launch");
             }
             else
             {
                 window.Show();
                 _ = window.Activate();
-                AppLog.Write("main-window shown");
             }
         }
         catch (Exception ex)
@@ -104,6 +115,10 @@ public partial class App : Application
         }
     }
 
+    /// <summary>
+    /// Disposes runtime resources before the process exits.
+    /// </summary>
+    /// <param name="e">The exit event arguments.</param>
     protected override void OnExit(ExitEventArgs e)
     {
         isExiting = true;
@@ -115,7 +130,6 @@ public partial class App : Application
         shutdownSignalListener?.Dispose();
         rawMouseInputWindowHook?.Dispose();
 
-        AppLog.Write($"exit code={e.ApplicationExitCode}");
         base.OnExit(e);
     }
 
@@ -129,7 +143,6 @@ public partial class App : Application
         if (!hideMainWindowToTrayOnClose)
         {
             isExiting = true;
-            AppLog.Write("main-window close requested; exiting interactive app");
             return;
         }
 
@@ -137,7 +150,6 @@ public partial class App : Application
         if (sender is Window window)
         {
             window.Hide();
-            AppLog.Write("main-window hidden to tray");
         }
     }
 
@@ -166,8 +178,7 @@ public partial class App : Application
 
     private void OnDispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)
     {
-        AppLog.Write("dispatcher-unhandled-exception");
-        AppLog.WriteException("dispatcher-unhandled-exception", e.Exception);
+        Trace.TraceError($"dispatcher-unhandled-exception{Environment.NewLine}{e.Exception}");
         e.Handled = true;
         if (!isExiting)
         {
@@ -180,25 +191,24 @@ public partial class App : Application
     {
         if (e.ExceptionObject is Exception exception)
         {
-            AppLog.WriteException("domain-unhandled-exception", exception);
+            Trace.TraceError($"domain-unhandled-exception{Environment.NewLine}{exception}");
         }
     }
 
     private static void ShowStartupError(Exception exception)
     {
-        AppLog.WriteException("startup-error", exception);
+        Trace.TraceError($"startup-error{Environment.NewLine}{exception}");
         _ = MessageBox.Show(
-            $"Steam HID Bridge failed to start.\n\n{exception.Message}\n\nDetails were written to:\n{AppLog.FilePath}",
+            $"Steam HID Bridge failed to start.\n\n{exception.Message}\n\nDetails were written to:\n{AppDataPaths.AppLogPath}",
             "Steam HID Bridge",
             MessageBoxButton.OK,
             MessageBoxImage.Error);
     }
 
-    private static void ShowSettingsRecoveryWarning(string message)
+    private static void ShowSettingsRecoveryWarning(string backupPath)
     {
-        AppLog.Write(message);
         _ = MessageBox.Show(
-            message,
+            $"The settings file was invalid and has been backed up.\n\nBackup:\n{backupPath}\n\nSteam HID Bridge started with empty settings.",
             "Steam HID Bridge Settings Reset",
             MessageBoxButton.OK,
             MessageBoxImage.Warning);
@@ -212,4 +222,25 @@ public partial class App : Application
             MessageBoxButton.YesNo,
             MessageBoxImage.Question) == MessageBoxResult.Yes;
     }
+
+    private static void ConfigureLogging()
+    {
+        _ = Directory.CreateDirectory(AppDataPaths.LogDirectory);
+        Trace.AutoFlush = true;
+        Trace.Listeners.Clear();
+        _ = Trace.Listeners.Add(new TextWriterTraceListener(AppDataPaths.AppLogPath));
+    }
+
+    private static void ConfigureSteamLibraryPath()
+    {
+        string steamDirectory = Path.Combine(AppContext.BaseDirectory, "Steam");
+        if (Directory.Exists(steamDirectory))
+        {
+            _ = SetDllDirectory(steamDirectory);
+        }
+    }
+
+    [LibraryImport("kernel32.dll", EntryPoint = "SetDllDirectoryW", SetLastError = true, StringMarshalling = StringMarshalling.Utf16)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static partial bool SetDllDirectory(string lpPathName);
 }

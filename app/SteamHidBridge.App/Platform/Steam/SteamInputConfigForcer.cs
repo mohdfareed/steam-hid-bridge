@@ -5,19 +5,14 @@ using System.Globalization;
 
 namespace SteamHidBridge.App.Platform.Steam;
 
-public sealed class SteamInputConfigForcer
+internal sealed class SteamInputConfigForcer
 {
     private ulong? requestedAppId;
 
     public ulong? AppId { get; } = DetectAppId();
 
-    public string StatusText => AppId is ulong appId
-        ? $"Steam config force available for appid {appId}"
-        : "Steam config force unavailable; no Steam app id was detected";
-
-    public bool TrySetForced(bool shouldForce, out string message)
+    public bool TrySetForced(bool shouldForce)
     {
-        message = string.Empty;
         if (AppId is not ulong appId)
         {
             return false;
@@ -31,11 +26,7 @@ public sealed class SteamInputConfigForcer
             }
 
             requestedAppId = appId;
-            if (TryOpenForceUrl(appId, out message))
-            {
-                message = $"Forced Steam Input config appid {appId}.";
-            }
-
+            _ = TryOpenForceUrl(appId);
             return true;
         }
 
@@ -45,17 +36,13 @@ public sealed class SteamInputConfigForcer
         }
 
         requestedAppId = null;
-        if (TryOpenForceUrl(0, out message))
-        {
-            message = "Reset Steam Input config forcing.";
-        }
-
+        _ = TryOpenForceUrl(0);
         return true;
     }
 
     public void Reset()
     {
-        _ = TrySetForced(false, out _);
+        _ = TrySetForced(false);
     }
 
     private static ulong? DetectAppId()
@@ -91,7 +78,7 @@ public sealed class SteamInputConfigForcer
         return false;
     }
 
-    private static bool TryOpenForceUrl(ulong appId, out string message)
+    private static bool TryOpenForceUrl(ulong appId)
     {
         try
         {
@@ -100,12 +87,10 @@ public sealed class SteamInputConfigForcer
                 FileName = $"steam://forceinputappid/{appId}",
                 UseShellExecute = true
             });
-            message = string.Empty;
             return true;
         }
         catch (Exception ex) when (ex is InvalidOperationException or Win32Exception)
         {
-            message = $"Could not force Steam Input config: {ex.Message}";
             return false;
         }
     }

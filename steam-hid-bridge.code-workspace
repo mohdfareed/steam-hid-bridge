@@ -1,12 +1,12 @@
 {
-	"folders": [
-		{
-			"path": "."
-		},
-		{
-			"name": "SteamHidBridge.Firmware",
-			"path": "firmware/SteamHidBridge.Firmware"
-		}
-	],
-    "settings": {}
+  "folders": [
+    {
+      "path": "."
+    },
+    {
+      "name": "firmware",
+      "path": "firmware"
+    }
+  ],
+  "settings": {}
 }

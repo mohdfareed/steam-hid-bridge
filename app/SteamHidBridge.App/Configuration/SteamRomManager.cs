@@ -6,9 +6,9 @@ using System.Text.Json;
 
 namespace SteamHidBridge.App.Configuration;
 
-public sealed record SrmManifestWriteResult(string Path, int ProfileCount);
+internal sealed record SrmManifestWriteResult(string Path, int ProfileCount);
 
-public sealed class SrmManifestWriter(AppSettingsStore settingsStore)
+internal sealed class SrmManifestWriter(AppSettingsStore settingsStore)
 {
     public SrmManifestWriteResult Write(string configuredPath, string? bridgeExecutable)
     {
@@ -48,7 +48,7 @@ public sealed class SrmManifestWriter(AppSettingsStore settingsStore)
 }
 
 
-public static class SteamRomManagerExport
+internal static class SteamRomManagerExport
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
@@ -91,12 +91,7 @@ public static class SteamRomManagerExport
 
     private static string QuoteArgument(string value)
     {
-        if (!value.Contains(' ') && !value.Contains('"'))
-        {
-            return value;
-        }
-
-        return $"\"{value.Replace("\"", "\\\"")}\"";
+        return !value.Contains(' ') && !value.Contains('"') ? value : $"\"{value.Replace("\"", "\\\"")}\"";
     }
 
     private sealed record SteamRomManagerEntry(

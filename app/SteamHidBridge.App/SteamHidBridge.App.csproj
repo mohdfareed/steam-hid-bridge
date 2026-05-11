@@ -9,11 +9,12 @@
     <UseWindowsForms>true</UseWindowsForms>
     <!-- Required by LibraryImport-generated Win32 interop; app logic should not use unsafe blocks. -->
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+
     <AssemblyName>SteamHidBridge</AssemblyName>
     <ApplicationIcon>Assets\SteamHidBridge.ico</ApplicationIcon>
     <AssemblyTitle>Steam HID Bridge</AssemblyTitle>
     <Product>Steam HID Bridge</Product>
-    <Description>Launch game profiles from Steam and bridge Steam Input toward keyboard and mouse HID output.</Description>
+    <Description>Launch game profiles from Steam and bridge Steam Input toward mouse HID output.</Description>
     <Company>mohdfareed</Company>
     <Authors>mohdfareed</Authors>
     <RepositoryUrl>https://github.com/mohdfareed/steam-hid-bridge</RepositoryUrl>
@@ -23,7 +24,7 @@
   <ItemGroup>
     <PackageReference Include="Steamworks.NET.AnyCPU" Version="2025.*" GeneratePathProperty="true" />
     <PackageReference Include="System.IO.Ports" Version="10.*" />
-    <ProjectReference Include="..\..\protocol\SteamHidBridge.Protocol\SteamHidBridge.Protocol.csproj" />
+    <ProjectReference Include="..\SteamHidBridge.Protocol\SteamHidBridge.Protocol.csproj" />
   </ItemGroup>
 
   <ItemGroup>

@@ -88,6 +88,8 @@ The profile model must distinguish:
 
 Use current official documentation for platform APIs, libraries, and tooling.
 
+The .NET solution root lives under `app/`. Keep `app/SteamHidBridge.slnx` and `app/Directory.Build.props` there so the app and protocol projects share one local .NET root.
+
 ## Baseline Decisions
 
 - `.slnx` solution format.
@@ -104,7 +106,7 @@ Use current official documentation for platform APIs, libraries, and tooling.
 - Publish output should be self-contained single-file for the selected Windows runtime unless the user asks for framework-dependent deployment. Publish always includes the app, `Firmware`, and `Steam` artifacts. The GUI decides which output systems are active.
 - Release tags use `vMAJOR.MINOR.PATCH`, for example `v0.1.1`. Tag pushes matching that shape build, test, package, and create a GitHub Release with `SteamHidBridge-win-x64.zip`.
 - The installer script lives at `scripts/install.ps1`, downloads from GitHub Releases, replaces the install folder, and creates a Desktop shortcut. User data must live outside the install folder.
-- App updates use GitHub Releases. The app checks the latest release, asks for confirmation, downloads the versioned `SteamHidBridge-update.ps1` release asset, closes all bridge instances, and replaces the published app folder. Do not bundle updater logic in the app package, and do not make the running process overwrite its own executable directly.
+- App updates use GitHub Releases. The app checks the latest release, asks for confirmation, downloads the versioned `SteamHidBridge-updater.ps1` release asset, closes all bridge instances, and replaces the published app folder. Do not bundle updater logic in the app package, and do not make the running process overwrite its own executable directly.
 - Runtime settings and logs belong under `%LOCALAPPDATA%\SteamHidBridge\`. Keep app lifecycle/error logging in `logs/app.log` and updater wrapper output in `logs/update.log`; do not add new ad hoc log files without a documented need.
 - Startup must not rewrite settings, regenerate the SRM manifest, or write Steam Input action manifests. Startup must not mutate Steam caches, SRM parser config, controller layouts, or Steam shortcut databases.
 - Steam Input config forcing uses Steam's official `steam://forceinputappid/<appid>` URL only while the configured receiver is foreground, and resets with `steam://forceinputappid/0` when foreground is lost or the bridge exits.
@@ -138,12 +140,14 @@ Do not implement Steam config editing, Steam VDF rewriting beyond the app-owned 
 ```text
 firmware/
 app/
+app/SteamHidBridge.slnx
+app/Directory.Build.props
 app/SteamHidBridge.App/Ui/
 app/SteamHidBridge.App/Core/
 app/SteamHidBridge.App/Configuration/
 app/SteamHidBridge.App/Platform/
 app/SteamHidBridge.App/Update/
-protocol/
+app/SteamHidBridge.Protocol/
 scripts/
 README.md
 AGENTS.md

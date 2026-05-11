@@ -1,3 +1,8 @@
+<#
+.SYNOPSIS
+Downloads and installs a GitHub Release build.
+#>
+
 param(
     [string]$Version = "",
     [string]$InstallDir = "",

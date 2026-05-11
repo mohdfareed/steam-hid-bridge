@@ -1,11 +1,12 @@
 using System;
+using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Input;
 
 namespace SteamHidBridge.App.Platform.App;
 
-public sealed record BridgeLaunchOptions(string ProfileId)
+internal sealed record BridgeLaunchOptions(string ProfileId)
 {
     public static BridgeLaunchOptions Parse(string[] args)
     {
@@ -43,7 +44,7 @@ public sealed record BridgeLaunchOptions(string ProfileId)
     }
 }
 
-public sealed class AsyncRelayCommand(Func<Task> execute, Func<bool>? canExecute = null) : ICommand
+internal sealed class AsyncRelayCommand(Func<Task> execute, Func<bool>? canExecute = null) : ICommand
 {
     private bool isExecuting;
 
@@ -70,7 +71,7 @@ public sealed class AsyncRelayCommand(Func<Task> execute, Func<bool>? canExecute
         }
         catch (Exception ex)
         {
-            AppLog.WriteException("command-failed", ex);
+            Trace.TraceError($"command-failed{Environment.NewLine}{ex}");
         }
         finally
         {
@@ -86,7 +87,7 @@ public sealed class AsyncRelayCommand(Func<Task> execute, Func<bool>? canExecute
 }
 
 
-public sealed class ShutdownSignalListener : IDisposable
+internal sealed class ShutdownSignalListener : IDisposable
 {
     public const string SignalName = @"Local\SteamHidBridge.ShutdownForUpdate";
 
@@ -105,7 +106,7 @@ public sealed class ShutdownSignalListener : IDisposable
 
         try
         {
-            waitTask.Wait(TimeSpan.FromSeconds(1));
+            _ = waitTask.Wait(TimeSpan.FromSeconds(1));
         }
         catch (AggregateException)
         {
@@ -117,7 +118,7 @@ public sealed class ShutdownSignalListener : IDisposable
 
     private void WaitForSignal(Action onShutdownRequested)
     {
-        var signaled = WaitHandle.WaitAny([shutdownEvent, cancellation.Token.WaitHandle]);
+        int signaled = WaitHandle.WaitAny([shutdownEvent, cancellation.Token.WaitHandle]);
         if (signaled == 0 && !cancellation.IsCancellationRequested)
         {
             onShutdownRequested();

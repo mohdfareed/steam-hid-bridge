@@ -3,25 +3,15 @@ using System.Diagnostics;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
-using SteamHidBridge.App.Platform.App;
 
 namespace SteamHidBridge.App.Platform.Board;
 
-public sealed class BoardFirmwareUpdater
+internal sealed class BoardFirmwareUpdater
 {
     private const string FirmwareFileName = "SteamHidBridge.Board";
     private readonly string firmwareDirectory = Path.Combine(AppContext.BaseDirectory, "Firmware");
 
-    public string StatusText
-    {
-        get
-        {
-            string hexPath = Path.Combine(firmwareDirectory, FirmwareFileName + ".hex");
-            return File.Exists(hexPath)
-                ? "Flash the packaged firmware to update the board."
-                : "Firmware package is missing.";
-        }
-    }
+    public bool HasBundledFirmware => File.Exists(Path.Combine(firmwareDirectory, FirmwareFileName + ".hex"));
 
     public async Task UpdateAsync(CancellationToken cancellationToken = default)
     {
@@ -63,25 +53,15 @@ public sealed class BoardFirmwareUpdater
             }
         };
 
-        AppLog.Write($"firmware update start file={fileName} args={arguments}");
         _ = process.Start();
         string standardOutput = await process.StandardOutput.ReadToEndAsync(cancellationToken).ConfigureAwait(false);
         string standardError = await process.StandardError.ReadToEndAsync(cancellationToken).ConfigureAwait(false);
         await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
 
-        if (!string.IsNullOrWhiteSpace(standardOutput))
-        {
-            AppLog.Write($"firmware update stdout={standardOutput.Trim()}");
-        }
-
-        if (!string.IsNullOrWhiteSpace(standardError))
-        {
-            AppLog.Write($"firmware update stderr={standardError.Trim()}");
-        }
-
         if (process.ExitCode != 0)
         {
-            throw new InvalidOperationException($"Firmware update failed with exit code {process.ExitCode}.");
+            throw new InvalidOperationException(
+                $"Firmware update failed with exit code {process.ExitCode}.{Environment.NewLine}{standardError}{standardOutput}".Trim());
         }
     }
 }

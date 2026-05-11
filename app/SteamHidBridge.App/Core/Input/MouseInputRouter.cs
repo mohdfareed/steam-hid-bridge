@@ -4,7 +4,7 @@ using SteamHidBridge.Protocol;
 
 namespace SteamHidBridge.App.Core.Input;
 
-public sealed class MouseInputRouter(
+internal sealed class MouseInputRouter(
     Action<MouseInputFrame> previewFrame,
     IEnumerable<IMouseInputConsumer> forwardingConsumers,
     Func<bool> isForwardingEnabled)
@@ -89,31 +89,11 @@ public sealed class MouseInputRouter(
 
     private static short ClampToInt16(int value)
     {
-        if (value > short.MaxValue)
-        {
-            return short.MaxValue;
-        }
-
-        if (value < short.MinValue)
-        {
-            return short.MinValue;
-        }
-
-        return (short)value;
+        return value > short.MaxValue ? short.MaxValue : value < short.MinValue ? short.MinValue : (short)value;
     }
 
     private static sbyte ClampToSByte(int value)
     {
-        if (value > sbyte.MaxValue)
-        {
-            return sbyte.MaxValue;
-        }
-
-        if (value < sbyte.MinValue)
-        {
-            return sbyte.MinValue;
-        }
-
-        return (sbyte)value;
+        return value > sbyte.MaxValue ? sbyte.MaxValue : value < sbyte.MinValue ? sbyte.MinValue : (sbyte)value;
     }
 }

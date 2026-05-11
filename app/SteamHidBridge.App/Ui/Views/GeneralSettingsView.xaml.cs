@@ -5,8 +5,14 @@ using System.Windows.Input;
 
 namespace SteamHidBridge.App.Ui.Views;
 
+/// <summary>
+/// Displays general application settings.
+/// </summary>
 public partial class GeneralSettingsView : UserControl
 {
+    /// <summary>
+    /// Initializes the general settings view.
+    /// </summary>
     public GeneralSettingsView()
     {
         InitializeComponent();

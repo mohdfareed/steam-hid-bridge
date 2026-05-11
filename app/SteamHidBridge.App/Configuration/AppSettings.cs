@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Security.Cryptography;
 using System.Text;
@@ -9,7 +8,13 @@ using SteamHidBridge.App.Platform.App;
 
 namespace SteamHidBridge.App.Configuration;
 
-public sealed class AppSettingsStore(string path, AppSettings document)
+internal sealed class InvalidAppSettingsException(string path, string backupPath, Exception innerException)
+    : Exception($"The settings file at '{path}' was invalid and has been backed up to '{backupPath}'.", innerException)
+{
+    public string BackupPath { get; } = backupPath;
+}
+
+internal sealed class AppSettingsStore(string path, AppSettings document)
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
@@ -24,53 +29,33 @@ public sealed class AppSettingsStore(string path, AppSettings document)
     public string FilePath { get; } = path;
     public AppSettings Document { get; } = document;
 
-    public static AppSettingsLoadResult LoadDefault()
+    public static AppSettingsStore CreateDefault()
+    {
+        return new AppSettingsStore(AppDataPaths.SettingsPath, Normalize(new AppSettings()));
+    }
+
+    public static AppSettingsStore LoadDefault()
     {
         string path = AppDataPaths.SettingsPath;
         if (!File.Exists(path))
         {
-            return new AppSettingsLoadResult(new AppSettingsStore(path, Normalize(new AppSettings())), null);
+            return new AppSettingsStore(path, new AppSettings());
         }
 
         try
         {
             string json = File.ReadAllText(path);
             AppSettings? document = JsonSerializer.Deserialize<AppSettings>(json, JsonOptions);
-            return new AppSettingsLoadResult(new AppSettingsStore(path, Normalize(document)), null);
+            return new AppSettingsStore(path, Normalize(document));
         }
         catch (Exception ex) when (ex is JsonException or NotSupportedException)
         {
             string backupPath = BackupInvalidSettings(path);
-            return new AppSettingsLoadResult(
-                new AppSettingsStore(path, Normalize(new AppSettings())),
-                $"The settings file was invalid and has been backed up.\n\nBackup:\n{backupPath}\n\nSteam HID Bridge started with empty settings.");
+            throw new InvalidAppSettingsException(path, backupPath, ex);
         }
     }
 
-    public void SaveGame(string oldId, string newId, GameProfile profile)
-    {
-        Save(latest =>
-        {
-            if (!string.Equals(oldId, newId, StringComparison.OrdinalIgnoreCase))
-            {
-                _ = latest.Games.Remove(oldId);
-            }
-
-            latest.Games[newId] = profile;
-        });
-    }
-
-    public void SaveGeneral(AppTheme theme, string boardPort, string srmManifestPath)
-    {
-        Save(latest =>
-        {
-            latest.General.Theme = theme;
-            latest.General.BoardPort = SerialPortSelection.Normalize(boardPort);
-            latest.General.SrmManifestPath = srmManifestPath.Trim();
-        });
-    }
-
-    private void Save(Action<AppSettings> update)
+    public void Save()
     {
         using Mutex mutex = new(false, BuildMutexName(FilePath));
         bool lockTaken = false;
@@ -86,17 +71,14 @@ public sealed class AppSettingsStore(string path, AppSettings document)
             }
 
             AppSettings latest = LoadFromPath(FilePath);
-            update(latest);
-            WriteAtomic(FilePath, latest);
-
-            Document.General.Theme = latest.General.Theme;
-            Document.General.BoardPort = latest.General.BoardPort;
-            Document.General.SrmManifestPath = latest.General.SrmManifestPath;
-            Document.Games.Clear();
-            foreach ((string gameId, GameProfile gameProfile) in latest.Games)
+            latest.General = Document.General;
+            latest.Games.Clear();
+            foreach ((string gameId, GameProfile gameProfile) in Document.Games)
             {
-                Document.Games[gameId] = gameProfile;
+                latest.Games[gameId] = gameProfile;
             }
+
+            WriteAtomic(FilePath, latest);
         }
         finally
         {
@@ -122,7 +104,6 @@ public sealed class AppSettingsStore(string path, AppSettings document)
     {
         document ??= new AppSettings();
         document.General ??= new GeneralSettings();
-        document.General.BoardPort = SerialPortSelection.Normalize(document.General.BoardPort);
         if (string.IsNullOrWhiteSpace(document.General.SrmManifestPath))
         {
             document.General.SrmManifestPath = AppDataPaths.SrmManifestPath;
@@ -131,18 +112,9 @@ public sealed class AppSettingsStore(string path, AppSettings document)
         document.Games ??= [];
         foreach (GameProfile game in document.Games.Values)
         {
-            if (!Enum.IsDefined(game.InputMode))
-            {
-                game.InputMode = BridgeInputMode.LegacyMouse;
-            }
-
-            if (!Enum.IsDefined(game.OutputMode))
-            {
-                game.OutputMode = BridgeOutputMode.None;
-            }
-
             game.ReceiverProcesses ??= [];
         }
+
         return document;
     }
 
@@ -190,5 +162,3 @@ public sealed class AppSettingsStore(string path, AppSettings document)
     }
 
 }
-
-public sealed record AppSettingsLoadResult(AppSettingsStore Store, string? WarningMessage);

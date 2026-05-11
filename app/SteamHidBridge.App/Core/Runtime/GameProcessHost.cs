@@ -3,12 +3,11 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using SteamHidBridge.App.Configuration;
-using SteamHidBridge.App.Platform.App;
 using SteamHidBridge.App.Platform.Windows;
 
 namespace SteamHidBridge.App.Core.Runtime;
 
-public sealed class GameProcessHost(Action<string, bool> setActivity) : IDisposable
+internal sealed class GameProcessHost : IDisposable
 {
     private ChildProcessJob? childProcessJob;
     private Process? process;
@@ -16,24 +15,21 @@ public sealed class GameProcessHost(Action<string, bool> setActivity) : IDisposa
     public bool HasLaunchedProcess => process is not null;
     public bool HasExited { get; private set; } = true;
 
-    public void Launch(string id, GameProfile profile)
+    public void Launch(GameProfile profile)
     {
         if (string.IsNullOrWhiteSpace(profile.Executable))
         {
-            setActivity("No executable configured.", true);
-            return;
+            throw new InvalidOperationException("No executable configured.");
         }
 
         if (!File.Exists(profile.Executable))
         {
-            setActivity($"Executable not found: {profile.Executable}", true);
-            return;
+            throw new FileNotFoundException($"Executable not found: {profile.Executable}", profile.Executable);
         }
 
         if (process is { HasExited: false })
         {
-            setActivity("A launched process is already running.", true);
-            return;
+            throw new InvalidOperationException("A launched process is already running.");
         }
 
         string workingDirectory = string.IsNullOrWhiteSpace(profile.WorkingDirectory)
@@ -48,20 +44,12 @@ public sealed class GameProcessHost(Action<string, bool> setActivity) : IDisposa
                 Arguments = profile.Arguments,
                 WorkingDirectory = workingDirectory,
                 UseShellExecute = false
-            });
-
-            if (launchedProcess is null)
-            {
-                setActivity("Launch failed: process was not created.", true);
-                return;
-            }
-
+            }) ?? throw new InvalidOperationException("Launch failed.");
             Track(launchedProcess);
-            setActivity($"Launched {id}.", false);
         }
         catch (Exception ex) when (ex is InvalidOperationException or Win32Exception)
         {
-            setActivity($"Launch failed: {ex.Message}", true);
+            throw new InvalidOperationException($"Launch failed: {ex.Message}", ex);
         }
     }
 
@@ -71,13 +59,12 @@ public sealed class GameProcessHost(Action<string, bool> setActivity) : IDisposa
         {
             if (process is { HasExited: false } runningProcess)
             {
-                setActivity($"Stopping launched process {runningProcess.Id}.", false);
                 runningProcess.Kill(entireProcessTree: true);
             }
         }
         catch (Exception ex) when (ex is InvalidOperationException or Win32Exception)
         {
-            setActivity($"Could not stop launched process: {ex.Message}", true);
+            Trace.TraceError($"stop-launched-process-failed{Environment.NewLine}{ex}");
         }
         finally
         {
@@ -104,17 +91,9 @@ public sealed class GameProcessHost(Action<string, bool> setActivity) : IDisposa
         launchedProcess.Exited += (_, _) =>
         {
             HasExited = true;
-            setActivity($"Launched process exited: {launchedProcess.Id}", false);
         };
 
-        if (TryTrackProcessTree(launchedProcess))
-        {
-            AppLog.Write($"tracking launched process tree={launchedProcess.Id}");
-        }
-        else
-        {
-            AppLog.Write($"tracking launched process directly={launchedProcess.Id}");
-        }
+        _ = TryTrackProcessTree(launchedProcess);
     }
 
     private bool TryTrackProcessTree(Process launchedProcess)
@@ -126,7 +105,7 @@ public sealed class GameProcessHost(Action<string, bool> setActivity) : IDisposa
         }
         catch (Exception ex) when (ex is InvalidOperationException or Win32Exception)
         {
-            AppLog.WriteException("child-process-job-unavailable", ex);
+            Trace.TraceError($"child-process-job-unavailable{Environment.NewLine}{ex}");
             return false;
         }
     }

@@ -7,7 +7,7 @@ using System.Runtime.InteropServices;
 
 namespace SteamHidBridge.App.Platform.Windows;
 
-public static partial class WindowsRuntime
+internal static partial class WindowsRuntime
 {
     public static string GetForegroundProcessName()
     {

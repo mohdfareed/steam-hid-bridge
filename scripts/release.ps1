@@ -1,3 +1,8 @@
+<#
+.SYNOPSIS
+Packages a release zip, or runs the local tag-and-push release gate with -TagRelease.
+#>
+
 param(
     [string]$Configuration = "Release",
     [string]$Runtime = "win-x64",

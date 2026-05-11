@@ -1,3 +1,8 @@
+<#
+.SYNOPSIS
+Implementation behind scripts/install.ps1. Downloads a release zip, replaces the install folder, and optionally creates a desktop shortcut.
+#>
+
 param(
     [string]$Version = "",
     [string]$InstallDir = "",

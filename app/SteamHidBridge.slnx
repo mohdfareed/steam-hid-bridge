@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="SteamHidBridge.App/SteamHidBridge.App.csproj" />
+  <Project Path="SteamHidBridge.Protocol/SteamHidBridge.Protocol.csproj" />
+</Solution>

@@ -46,17 +46,14 @@
                            VerticalAlignment="Center"
                            Foreground="{DynamicResource {x:Static SystemColors.GrayTextBrushKey}}" />
                 <StatusBarItem>
-                    <TextBlock Text="{Binding ActivityText}">
-                        <TextBlock.Style>
-                            <Style TargetType="TextBlock">
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding ActivityIsError}" Value="True">
-                                        <Setter Property="Foreground" Value="#D13438" />
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </TextBlock.Style>
-                    </TextBlock>
+                    <TextBlock Text="{Binding InputSourceText}" />
+                </StatusBarItem>
+                <TextBlock Text="|"
+                           Margin="4,0"
+                           VerticalAlignment="Center"
+                           Foreground="{DynamicResource {x:Static SystemColors.GrayTextBrushKey}}" />
+                <StatusBarItem>
+                    <TextBlock Text="{Binding OutputTargetText}" />
                 </StatusBarItem>
             </StatusBar>
         </Border>
@@ -70,9 +67,6 @@
             </TabItem>
             <TabItem Header="Output">
                 <views:OutputView Margin="12" />
-            </TabItem>
-            <TabItem Header="Diagnostics">
-                <views:DiagnosticsView Margin="12" />
             </TabItem>
         </TabControl>
     </DockPanel>

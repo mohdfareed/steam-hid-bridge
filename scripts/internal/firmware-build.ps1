@@ -1,10 +1,15 @@
+<#
+.SYNOPSIS
+Builds the PlatformIO firmware environment.
+#>
+
 param(
     [string] $Environment = "teensy40"
 )
 
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
-$firmwareDir = Join-Path $root "firmware\SteamHidBridge.Firmware"
+$firmwareDir = Join-Path $root "firmware"
 
 function Find-PlatformIO {
     $command = Get-Command "pio" -ErrorAction SilentlyContinue

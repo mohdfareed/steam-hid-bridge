@@ -18,7 +18,7 @@ env:
   DOTNET_NOLOGO: true
   RUNTIME: win-x64
   PACKAGE_NAME: SteamHidBridge-win-x64.zip
-  UPDATER_NAME: SteamHidBridge-update.ps1
+  UPDATER_NAME: SteamHidBridge-updater.ps1
 
 jobs:
   release:

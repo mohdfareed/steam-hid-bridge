@@ -1,3 +1,8 @@
+<#
+.SYNOPSIS
+Formats and builds the app, then builds the firmware.
+#>
+
 param(
     [string]$Configuration = "Debug"
 )

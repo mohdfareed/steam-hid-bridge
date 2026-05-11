@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
@@ -9,14 +10,13 @@ using SteamHidBridge.App.Platform.App;
 
 namespace SteamHidBridge.App.Ui.ViewModels;
 
-public sealed partial class MainWindowViewModel
+internal sealed partial class MainWindowViewModel
 {
     private Task NewGameAsync()
     {
         string gameId = CreateUniqueGameId();
         settingsStore.Document.Games[gameId] = new GameProfile();
         ReloadGameIds(gameId);
-        SetActivity($"Created {gameId}.");
         return Task.CompletedTask;
     }
 
@@ -24,7 +24,7 @@ public sealed partial class MainWindowViewModel
     {
         if (string.IsNullOrWhiteSpace(EditGameId))
         {
-            SetError("Cannot save without an id.");
+            ShowError("Cannot save without an id.");
             return Task.CompletedTask;
         }
 
@@ -32,11 +32,17 @@ public sealed partial class MainWindowViewModel
         string newId = EditGameId.Trim();
         try
         {
-            settingsStore.SaveGame(selectedGameId, newId, profile);
+            if (!string.Equals(selectedGameId, newId, StringComparison.OrdinalIgnoreCase))
+            {
+                _ = settingsStore.Document.Games.Remove(selectedGameId);
+            }
+
+            settingsStore.Document.Games[newId] = profile;
+            settingsStore.Save();
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException or InvalidOperationException)
         {
-            SetError($"Save failed: {ex.Message}");
+            ShowError($"Save failed: {ex.Message}");
             return Task.CompletedTask;
         }
 
@@ -49,43 +55,52 @@ public sealed partial class MainWindowViewModel
             ReloadGameIds(newId);
         }
 
-        if (WriteSrmManifest())
-        {
-            SetActivity($"Saved {newId} and wrote Steam ROM Manager manifest.");
-        }
+        _ = WriteSrmManifest();
 
         return Task.CompletedTask;
     }
 
     private Task LaunchGameAsync()
     {
-        runtime.SetProfile(selectedGameId, ReadEditorProfile());
-        runtime.LaunchProfile();
+        runtime.SetProfile(ReadEditorProfile());
+        try
+        {
+            runtime.LaunchProfile();
+        }
+        catch (Exception ex) when (ex is FileNotFoundException or InvalidOperationException or Win32Exception)
+        {
+            ShowError(ex.Message);
+        }
+
         return Task.CompletedTask;
     }
 
     private Task SaveGeneralAsync()
     {
-        settingsStore.SaveGeneral(SelectedTheme, BoardPort, SrmManifestPath);
+        int? boardPortNumber = ParseBoardPort(BoardPort);
+        if (!string.IsNullOrWhiteSpace(BoardPort) && boardPortNumber is null)
+        {
+            ShowError("Board port must be a positive integer.");
+            return Task.CompletedTask;
+        }
+
+        settingsStore.Document.General.Theme = SelectedTheme;
+        settingsStore.Document.General.BoardPort = boardPortNumber;
+        settingsStore.Document.General.SrmManifestPath = SrmManifestPath.Trim();
+        settingsStore.Save();
         applyBoardPort(settingsStore.Document.General.BoardPort);
         savedTheme = settingsStore.Document.General.Theme;
-        savedBoardPort = settingsStore.Document.General.BoardPort;
+        savedBoardPort = BoardPort.Trim();
         savedSrmManifestPath = settingsStore.Document.General.SrmManifestPath;
         saveGeneralCommand.RaiseCanExecuteChanged();
-        if (WriteSrmManifest())
-        {
-            SetActivity($"Saved general settings and wrote Steam ROM Manager manifest for {settingsStore.Document.Games.Count} profile(s).");
-        }
+        _ = WriteSrmManifest();
 
         return Task.CompletedTask;
     }
 
     private Task ExportSrmManifestAsync()
     {
-        if (WriteSrmManifest())
-        {
-            SetActivity($"Wrote Steam ROM Manager manifest for {settingsStore.Document.Games.Count} profile(s).");
-        }
+        _ = WriteSrmManifest();
 
         return Task.CompletedTask;
     }
@@ -95,11 +110,10 @@ public sealed partial class MainWindowViewModel
         try
         {
             AppDataFolder.Open();
-            SetActivity($"Opened {AppDataPaths.RootDirectory}.");
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
         {
-            SetError($"Could not open app data folder: {ex.Message}");
+            ShowError($"Could not open app data folder: {ex.Message}");
         }
 
         return Task.CompletedTask;
@@ -109,14 +123,13 @@ public sealed partial class MainWindowViewModel
     {
         try
         {
-            SetActivity("Updating board firmware. Press the board program button if requested.");
             await boardFirmwareUpdater.UpdateAsync().ConfigureAwait(true);
-            SetActivity("Board firmware update started.");
+            ShowInfo("Board firmware update started.");
             OnPropertyChanged(nameof(BoardFirmwareText));
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
         {
-            SetError($"Board firmware update failed to start: {ex.Message}");
+            ShowError($"Board firmware update failed to start: {ex.Message}");
             OnPropertyChanged(nameof(BoardFirmwareText));
         }
     }
@@ -125,13 +138,12 @@ public sealed partial class MainWindowViewModel
     {
         try
         {
-            SrmManifestWriteResult result = srmManifestWriter.Write(SrmManifestPath, Environment.ProcessPath);
-            AppLog.Write($"srm manifest written path={result.Path} profiles={result.ProfileCount}");
+            _ = srmManifestWriter.Write(SrmManifestPath, Environment.ProcessPath);
             return true;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException or InvalidOperationException)
         {
-            SetError($"Could not write Steam ROM Manager manifest: {ex.Message}");
+            ShowError($"Could not write Steam ROM Manager manifest: {ex.Message}");
             return false;
         }
     }
@@ -231,7 +243,7 @@ public sealed partial class MainWindowViewModel
         selectedOutputMode = profile.OutputMode;
         editReceiverProcessesText = string.Join(" | ", profile.ReceiverProcesses);
         srmManifestPath = settingsStore.Document.General.SrmManifestPath;
-        boardPort = SerialPortSelection.ToUiText(settingsStore.Document.General.BoardPort);
+        boardPort = settingsStore.Document.General.BoardPort?.ToString() ?? string.Empty;
         selectedTheme = settingsStore.Document.General.Theme;
         savedGameId = gameId;
         savedProfile = CloneProfile(profile);
@@ -271,7 +283,7 @@ public sealed partial class MainWindowViewModel
             return;
         }
 
-        runtime.SetProfile(selectedGameId, ReadEditorProfile());
+        runtime.SetProfile(ReadEditorProfile());
 
         if (updateInputMode)
         {

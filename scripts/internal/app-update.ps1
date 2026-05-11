@@ -1,3 +1,8 @@
+<#
+.SYNOPSIS
+Implementation behind the in-app updater. Downloads a release zip, waits for running bridge processes to exit, then replaces the install folder.
+#>
+
 param(
     [Parameter(Mandatory = $true)]
     [string] $PackageUrl,

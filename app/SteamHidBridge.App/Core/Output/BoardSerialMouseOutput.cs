@@ -1,15 +1,15 @@
 using System;
+using System.Diagnostics;
 using System.IO;
 using System.IO.Ports;
 using System.Threading;
 using SteamHidBridge.App.Configuration;
 using SteamHidBridge.App.Core.Input;
-using SteamHidBridge.App.Platform.App;
 using SteamHidBridge.Protocol;
 
 namespace SteamHidBridge.App.Core.Output;
 
-public sealed class BoardSerialMouseOutput(string configuredPort) : IMouseInputConsumer, IOutputStatusProvider, IDisposable
+internal sealed class BoardSerialMouseOutput(int? configuredPortNumber) : IMouseInputConsumer, IOutputStatusProvider, IDisposable
 {
     private const int BaudRate = 115200;
     private static readonly TimeSpan ReconnectInterval = TimeSpan.FromSeconds(1);
@@ -19,29 +19,30 @@ public sealed class BoardSerialMouseOutput(string configuredPort) : IMouseInputC
     private SerialPort? serialPort;
     private byte sequence;
     private long nextConnectAttempt;
-    private string configuredPort = SerialPortSelection.ToWindowsPortName(configuredPort);
-    private string statusText = "Board disconnected";
+    private int? configuredPortNumber = configuredPortNumber;
     private bool isDisposed;
 
-    public string StatusText
+    public OutputStatus Status
     {
         get
         {
             lock (syncLock)
             {
-                return statusText;
+                return field;
             }
         }
-    }
 
-    public void SetPort(string value)
+        private set;
+    } = new(BridgeOutputMode.Board, OutputConnectionState.Disconnected);
+
+    public void SetPort(int? value)
     {
         lock (syncLock)
         {
-            configuredPort = SerialPortSelection.ToWindowsPortName(value);
+            configuredPortNumber = value;
             ClosePort();
             nextConnectAttempt = 0;
-            statusText = "Board disconnected";
+            Status = new(BridgeOutputMode.Board, OutputConnectionState.Disconnected);
         }
     }
 
@@ -75,27 +76,25 @@ public sealed class BoardSerialMouseOutput(string configuredPort) : IMouseInputC
                 frame.PointerDeltaX,
                 frame.PointerDeltaY,
                 frame.VerticalWheel,
-                frame.Buttons,
-                KeyboardModifiers.None,
-                KeyboardUsageId: 0);
+                frame.Buttons);
 
             report.WriteTo(payload);
             BridgeFrame bridgeFrame = new(BridgeCommand.HidInput, sequence++, payload);
             if (!bridgeFrame.TryWrite(frameBuffer, out int bytesWritten))
             {
-                statusText = "Board frame encode failed";
+                Status = new(BridgeOutputMode.Board, OutputConnectionState.Error, Error: OutputError.FrameEncodeFailed);
                 return;
             }
 
             try
             {
                 port.Write(frameBuffer, 0, bytesWritten);
-                statusText = $"Board connected: {port.PortName}";
+                Status = new(BridgeOutputMode.Board, OutputConnectionState.Connected, port.PortName);
             }
             catch (Exception ex) when (ex is IOException or InvalidOperationException or TimeoutException or UnauthorizedAccessException)
             {
-                AppLog.WriteException("board-write-failed", ex);
-                statusText = $"Board write failed: {port.PortName}";
+                Trace.TraceError($"board-write-failed{Environment.NewLine}{ex}");
+                Status = new(BridgeOutputMode.Board, OutputConnectionState.Error, port.PortName, OutputError.WriteFailed);
                 ClosePort();
             }
         }
@@ -138,28 +137,26 @@ public sealed class BoardSerialMouseOutput(string configuredPort) : IMouseInputC
             {
                 port.Open();
                 serialPort = port;
-                statusText = $"Board connected: {portName}";
-                AppLog.Write($"board connected port={portName}");
+                Status = new(BridgeOutputMode.Board, OutputConnectionState.Connected, portName);
                 return serialPort;
             }
             catch (Exception ex) when (ex is IOException or InvalidOperationException or TimeoutException or UnauthorizedAccessException)
             {
-                AppLog.Write($"board connect failed port={portName} error={ex.Message}");
                 port.Dispose();
             }
         }
 
-        statusText = configuredPort.Equals(SerialPortSelection.Auto, StringComparison.OrdinalIgnoreCase)
-            ? "Board disconnected: no serial port opened"
-            : $"Board disconnected: {configuredPort}";
+        Status = configuredPortNumber is int portNumber
+            ? new OutputStatus(BridgeOutputMode.Board, OutputConnectionState.Disconnected, ToWindowsPortName(portNumber))
+            : new OutputStatus(BridgeOutputMode.Board, OutputConnectionState.Disconnected);
         return null;
     }
 
     private string[] CandidatePorts()
     {
-        if (!configuredPort.Equals(SerialPortSelection.Auto, StringComparison.OrdinalIgnoreCase))
+        if (configuredPortNumber is int portNumber)
         {
-            return [configuredPort];
+            return [ToWindowsPortName(portNumber)];
         }
 
         string[] ports = SerialPort.GetPortNames();
@@ -184,4 +181,8 @@ public sealed class BoardSerialMouseOutput(string configuredPort) : IMouseInputC
         }
     }
 
+    private static string ToWindowsPortName(int portNumber)
+    {
+        return $"COM{portNumber}";
+    }
 }

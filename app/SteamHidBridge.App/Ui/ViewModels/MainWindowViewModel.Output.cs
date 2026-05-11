@@ -3,7 +3,7 @@ using SteamHidBridge.Protocol;
 
 namespace SteamHidBridge.App.Ui.ViewModels;
 
-public sealed partial class MainWindowViewModel
+internal sealed partial class MainWindowViewModel
 {
     private void PreviewMouseInput(MouseInputFrame frame)
     {
@@ -11,9 +11,7 @@ public sealed partial class MainWindowViewModel
             frame.PointerDeltaX,
             frame.PointerDeltaY,
             frame.VerticalWheel,
-            frame.Buttons,
-            KeyboardModifiers.None,
-            0));
+            frame.Buttons));
     }
 
     private void SetLastReport(HidInputReport report)

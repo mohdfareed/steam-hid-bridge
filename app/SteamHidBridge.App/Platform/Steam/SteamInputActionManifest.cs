@@ -4,7 +4,7 @@ using SteamHidBridge.App.Platform.App;
 
 namespace SteamHidBridge.App.Platform.Steam;
 
-public static class SteamInputActionManifest
+internal static class SteamInputActionManifest
 {
     public const string ActionSet = "BridgeMouse";
     public const string Pointer = "Pointer";

@@ -8,7 +8,7 @@ using SteamHidBridge.Protocol;
 
 namespace SteamHidBridge.App.Platform.Windows;
 
-public sealed partial class RawMouseInputWindowHook : IDisposable
+internal sealed partial class RawMouseInputWindowHook : IDisposable
 {
     private const int UsagePageGenericDesktop = 0x01;
     private const int UsageMouse = 0x02;
@@ -163,32 +163,12 @@ public sealed partial class RawMouseInputWindowHook : IDisposable
 
         short signedData = unchecked((short)data);
         int notches = signedData / WheelDelta;
-        if (notches > sbyte.MaxValue)
-        {
-            return sbyte.MaxValue;
-        }
-
-        if (notches < sbyte.MinValue)
-        {
-            return sbyte.MinValue;
-        }
-
-        return (sbyte)notches;
+        return notches > sbyte.MaxValue ? sbyte.MaxValue : notches < sbyte.MinValue ? sbyte.MinValue : (sbyte)notches;
     }
 
     private static short ClampToInt16(int value)
     {
-        if (value > short.MaxValue)
-        {
-            return short.MaxValue;
-        }
-
-        if (value < short.MinValue)
-        {
-            return short.MinValue;
-        }
-
-        return (short)value;
+        return value > short.MaxValue ? short.MaxValue : value < short.MinValue ? short.MinValue : (short)value;
     }
 
     [StructLayout(LayoutKind.Sequential)]

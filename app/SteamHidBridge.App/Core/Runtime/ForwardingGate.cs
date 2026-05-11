@@ -4,9 +4,9 @@ using SteamHidBridge.App.Platform.Windows;
 
 namespace SteamHidBridge.App.Core.Runtime;
 
-public sealed record ForwardingGateResult(string StatusText, bool ReceiverExited);
+internal readonly record struct ForwardingGateResult(bool IsForwarding, bool ReceiverExited);
 
-public sealed class ForwardingGate(Action<string, bool> setActivity) : IDisposable
+internal sealed class ForwardingGate : IDisposable
 {
     private readonly SteamInputConfigForcer steamInputConfigForcer = new();
     private bool hasSeenReceiverProcess;
@@ -24,7 +24,7 @@ public sealed class ForwardingGate(Action<string, bool> setActivity) : IDisposab
         if (receivers.Length == 0)
         {
             SetForwarding(false);
-            return new ForwardingGateResult("Forwarding off", false);
+            return new ForwardingGateResult(false, false);
         }
 
         bool receiverRunning = WindowsRuntime.IsAnyProcessRunning(receivers);
@@ -36,12 +36,12 @@ public sealed class ForwardingGate(Action<string, bool> setActivity) : IDisposab
         if (launchMode && hasSeenReceiverProcess && !receiverRunning)
         {
             SetForwarding(false);
-            return new ForwardingGateResult("Forwarding off", true);
+            return new ForwardingGateResult(false, true);
         }
 
         bool shouldForward = receiverRunning && IsReceiverProcess(WindowsRuntime.GetForegroundProcessName(), receivers);
         SetForwarding(shouldForward);
-        return new ForwardingGateResult(shouldForward ? "Forwarding on" : "Forwarding off", false);
+        return new ForwardingGateResult(shouldForward, false);
     }
 
     public void Dispose()
@@ -52,10 +52,7 @@ public sealed class ForwardingGate(Action<string, bool> setActivity) : IDisposab
     private void SetForwarding(bool value)
     {
         IsForwarding = value;
-        if (steamInputConfigForcer.TrySetForced(value, out string message) && !string.IsNullOrWhiteSpace(message))
-        {
-            setActivity(message, false);
-        }
+        _ = steamInputConfigForcer.TrySetForced(value);
     }
 
     private static bool IsReceiverProcess(string processName, string[] receivers)

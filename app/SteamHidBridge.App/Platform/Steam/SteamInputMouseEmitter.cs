@@ -1,15 +1,15 @@
 using System;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using SteamHidBridge.App.Core.Input;
-using SteamHidBridge.App.Platform.App;
 using SteamHidBridge.Protocol;
 using Steamworks;
 
 namespace SteamHidBridge.App.Platform.Steam;
 
-public sealed class SteamInputMouseEmitter(Action<MouseInputFrame> publishFrame, Action<string, bool> publishStatus) : IDisposable
+internal sealed class SteamInputMouseEmitter(Action<MouseInputFrame> publishFrame, Action<InputSourceStatus> publishStatus) : IDisposable
 {
     private static readonly TimeSpan PollInterval = TimeSpan.FromMilliseconds(1);
     private readonly CancellationTokenSource cancellation = new();
@@ -29,27 +29,19 @@ public sealed class SteamInputMouseEmitter(Action<MouseInputFrame> publishFrame,
     private InputDigitalActionHandle_t forwardClick;
     private InputDigitalActionHandle_t wheelUp;
     private InputDigitalActionHandle_t wheelDown;
-    private string statusText = "Steam Input inactive.";
-    private bool statusIsError;
-
-    public string StatusText
-    {
-        get
-        {
-            lock (syncLock)
-            {
-                return statusText;
-            }
-        }
-    }
+    private InputSourceStatus status = new(InputSourceState.Inactive);
 
     public void SetEnabled(bool value)
     {
         lock (syncLock)
         {
             enabled = value;
-            statusText = value ? "Steam Input starting." : "Steam Input inactive.";
+            status = value
+                ? new InputSourceStatus(InputSourceState.Starting)
+                : new InputSourceStatus(InputSourceState.Inactive);
         }
+
+        publishStatus(status);
 
         if (value)
         {
@@ -68,26 +60,26 @@ public sealed class SteamInputMouseEmitter(Action<MouseInputFrame> publishFrame,
         cancellation.Cancel();
         try
         {
-            pollTask?.Wait(TimeSpan.FromSeconds(1));
+            _ = (pollTask?.Wait(TimeSpan.FromSeconds(1)));
         }
         catch (AggregateException ex) when (ex.InnerExceptions.All(static exception => exception is OperationCanceledException))
         {
         }
         catch (AggregateException ex)
         {
-            AppLog.WriteException("steam-input-dispose-failed", ex);
+            Trace.TraceError($"steam-input-dispose-failed{Environment.NewLine}{ex}");
         }
 
         if (initialized)
         {
             try
             {
-                SteamInput.Shutdown();
+                _ = SteamInput.Shutdown();
                 SteamAPI.Shutdown();
             }
             catch (Exception ex)
             {
-                AppLog.WriteException("steam-input-shutdown-failed", ex);
+                Trace.TraceError($"steam-input-shutdown-failed{Environment.NewLine}{ex}");
             }
         }
 
@@ -132,23 +124,40 @@ public sealed class SteamInputMouseEmitter(Action<MouseInputFrame> publishFrame,
         try
         {
             string manifestPath = SteamInputActionManifest.Write();
-            string error = "";
-            ESteamAPIInitResult initResult = SteamAPI.InitEx(out error);
+            ESteamAPIInitResult initResult = SteamAPI.InitEx(out string error);
             if (initResult != ESteamAPIInitResult.k_ESteamAPIInitResult_OK)
             {
-                SetStatus($"Steam Input unavailable: {initResult}. {error}".Trim(), isError: true);
+                InputSourceStatus next = new(InputSourceState.Error, Detail: $"{initResult}. {error}".Trim());
+                if (next != status)
+                {
+                    status = next;
+                    publishStatus(status);
+                }
+
                 return false;
             }
 
             if (!SteamInput.SetInputActionManifestFilePath(manifestPath))
             {
-                SetStatus($"Steam Input unavailable: could not load action manifest {manifestPath}", isError: true);
+                InputSourceStatus next = new(InputSourceState.Error, Detail: $"Could not load action manifest {manifestPath}");
+                if (next != status)
+                {
+                    status = next;
+                    publishStatus(status);
+                }
+
                 return false;
             }
 
             if (!SteamInput.Init(false))
             {
-                SetStatus("Steam Input unavailable: SteamInput.Init failed.", isError: true);
+                InputSourceStatus next = new(InputSourceState.Error, Detail: "SteamInput.Init failed.");
+                if (next != status)
+                {
+                    status = next;
+                    publishStatus(status);
+                }
+
                 return false;
             }
 
@@ -162,13 +171,25 @@ public sealed class SteamInputMouseEmitter(Action<MouseInputFrame> publishFrame,
             wheelUp = SteamInput.GetDigitalActionHandle(SteamInputActionManifest.WheelUp);
             wheelDown = SteamInput.GetDigitalActionHandle(SteamInputActionManifest.WheelDown);
             initialized = true;
-            SetStatus("Steam Input ready.");
+            InputSourceStatus ready = new(InputSourceState.Ready);
+            if (ready != status)
+            {
+                status = ready;
+                publishStatus(status);
+            }
+
             return true;
         }
         catch (Exception ex) when (ex is DllNotFoundException or InvalidOperationException or EntryPointNotFoundException)
         {
-            AppLog.WriteException("steam-input-init-failed", ex);
-            SetStatus($"Steam Input unavailable: {ex.Message}", isError: true);
+            Trace.TraceError($"steam-input-init-failed{Environment.NewLine}{ex}");
+            InputSourceStatus next = new(InputSourceState.Error, Detail: ex.Message);
+            if (next != status)
+            {
+                status = next;
+                publishStatus(status);
+            }
+
             return false;
         }
     }
@@ -182,7 +203,13 @@ public sealed class SteamInputMouseEmitter(Action<MouseInputFrame> publishFrame,
         int controllerCount = SteamInput.GetConnectedControllers(handles);
         if (controllerCount == 0)
         {
-            SetStatus("Steam Input ready; no controllers.");
+            InputSourceStatus ready = new(InputSourceState.Ready);
+            if (ready != status)
+            {
+                status = ready;
+                publishStatus(status);
+            }
+
             return;
         }
 
@@ -210,13 +237,24 @@ public sealed class SteamInputMouseEmitter(Action<MouseInputFrame> publishFrame,
 
         if (dx == 0 && dy == 0 && wheel == 0 && buttons == lastButtons)
         {
-            SetStatus($"Steam Input ready; {controllerCount} controller(s).");
+            InputSourceStatus active = new(InputSourceState.Ready, controllerCount);
+            if (active != status)
+            {
+                status = active;
+                publishStatus(status);
+            }
+
             return;
         }
 
         lastButtons = buttons;
         publishFrame(new MouseInputFrame(ClampToInt16(dx), ClampToInt16(dy), wheel, buttons));
-        SetStatus($"Steam Input ready; {controllerCount} controller(s).");
+        InputSourceStatus nextStatus = new(InputSourceState.Ready, controllerCount);
+        if (nextStatus != status)
+        {
+            status = nextStatus;
+            publishStatus(status);
+        }
     }
 
     private MouseButtons ReadButtons(InputHandle_t handle)
@@ -254,22 +292,6 @@ public sealed class SteamInputMouseEmitter(Action<MouseInputFrame> publishFrame,
     {
         InputDigitalActionData_t data = SteamInput.GetDigitalActionData(handle, action);
         return data.bActive != 0 && data.bState != 0;
-    }
-
-    private void SetStatus(string value, bool isError = false)
-    {
-        bool changed;
-        lock (syncLock)
-        {
-            changed = !string.Equals(statusText, value, StringComparison.Ordinal) || statusIsError != isError;
-            statusText = value;
-            statusIsError = isError;
-        }
-
-        if (changed)
-        {
-            publishStatus(value, isError);
-        }
     }
 
     private static short ClampToInt16(int value)

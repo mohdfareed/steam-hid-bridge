@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using System.Windows;
 using System.Windows.Input;
 using SteamHidBridge.App.Configuration;
 using SteamHidBridge.App.Core.Runtime;
@@ -13,11 +14,10 @@ using SteamHidBridge.Protocol;
 
 namespace SteamHidBridge.App.Ui.ViewModels;
 
-public sealed partial class MainWindowViewModel : INotifyPropertyChanged
+internal sealed partial class MainWindowViewModel : INotifyPropertyChanged
 {
     public sealed record SettingOption<T>(T Value, string Label);
 
-    private readonly BridgeLaunchOptions launchOptions;
     private readonly AppSettingsStore settingsStore;
     private readonly BridgeRuntime runtime;
     private readonly SrmManifestWriter srmManifestWriter;
@@ -25,11 +25,9 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private readonly BoardFirmwareUpdater boardFirmwareUpdater;
     private readonly Action<BridgeInputMode> applyInputMode;
     private readonly Action<BridgeOutputMode> applyOutputMode;
-    private readonly Action<string> applyBoardPort;
+    private readonly Action<int?> applyBoardPort;
     private readonly Action<AppTheme> applyTheme;
     private readonly Func<AppUpdateCheckResult, bool> confirmUpdate;
-    private readonly Action<Action> dispatch;
-    private readonly string appDataPath = AppDataPaths.RootDirectory;
     private readonly string activeProfileId;
     private string selectedGameId = string.Empty;
     private string editGameId = string.Empty;
@@ -50,7 +48,6 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private AppTheme selectedTheme;
     private bool isReloadingGameIds;
     private bool isForwardingActive;
-    private bool isActivityError;
     private HidInputReport lastReport;
     private readonly AsyncRelayCommand saveGameCommand;
     private readonly AsyncRelayCommand launchGameCommand;
@@ -63,12 +60,11 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         BridgeRuntime runtime,
         Action<BridgeInputMode> applyInputMode,
         Action<BridgeOutputMode> applyOutputMode,
-        Action<string> applyBoardPort,
+        Action<int?> applyBoardPort,
         Action<AppTheme> applyTheme,
         Func<AppUpdateCheckResult, bool> confirmUpdate,
         Action<Action> dispatch)
     {
-        this.launchOptions = launchOptions;
         this.settingsStore = settingsStore;
         this.runtime = runtime;
         srmManifestWriter = new SrmManifestWriter(settingsStore);
@@ -78,12 +74,10 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         this.applyBoardPort = applyBoardPort;
         this.applyTheme = applyTheme;
         this.confirmUpdate = confirmUpdate;
-        this.dispatch = dispatch;
         activeProfileId = launchOptions.ProfileId.Trim();
         appUpdater = new AppUpdater();
         runtime.MouseInput += frame => dispatch(() => PreviewMouseInput(frame));
         runtime.StatusChanged += status => dispatch(() => ApplyRuntimeStatus(status));
-        runtime.ActivityChanged += (message, isError) => dispatch(() => ApplyActivityMessage(message, isError));
         runtime.ExitRequested += exitCode => dispatch(() => RequestExit(exitCode));
 
         NewGameCommand = new AsyncRelayCommand(NewGameAsync);
@@ -100,8 +94,6 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         OpenAppDataCommand = new AsyncRelayCommand(OpenAppDataAsync);
 
         ReloadGameIds(launchOptions.ProfileId);
-        SetActivity($"Ready. profile={selectedGameId}");
-        AppLog.Write($"settings={settingsStore.FilePath}");
 
         if (!string.IsNullOrWhiteSpace(launchOptions.ProfileId))
         {
@@ -232,7 +224,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
 
     public string ProfileText => string.IsNullOrWhiteSpace(EditTitle) ? EditGameId : EditTitle;
     public string ReceiverProcessesText => ReceiverProcesses.Length == 0 ? "None configured" : string.Join(", ", ReceiverProcesses);
-    public string AppDataPath => appDataPath;
+    public string AppDataPath { get; } = AppDataPaths.RootDirectory;
 
     public string SrmManifestPath
     {
@@ -327,12 +319,6 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         private set => SetProperty(ref field, value);
     } = "Board disconnected";
 
-    public string ActivityText
-    {
-        get;
-        private set => SetProperty(ref field, value);
-    } = "Ready";
-
     public string PointerText => $"dx {lastReport.PointerDeltaX}, dy {lastReport.PointerDeltaY}";
     public string WheelText => $"wheel {lastReport.VerticalWheel}";
     public string MouseButtonsText => lastReport.MouseButtons == MouseButtons.None ? "buttons none" : $"buttons {lastReport.MouseButtons}";
@@ -342,9 +328,10 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     public string MouseBackBrush => MouseButtonBrush(MouseButtons.Back);
     public string MouseForwardBrush => MouseButtonBrush(MouseButtons.Forward);
     public string StatusBrush => isForwardingActive ? "SeaGreen" : "Gray";
-    public bool ActivityIsError => isActivityError;
     public string VersionText => appUpdater.CurrentVersionText;
-    public string BoardFirmwareText => boardFirmwareUpdater.StatusText;
+    public string BoardFirmwareText => boardFirmwareUpdater.HasBundledFirmware
+        ? "Flash the packaged firmware to update the board."
+        : "Firmware package is missing.";
     public string ActiveProfileText => string.IsNullOrWhiteSpace(activeProfileId) ? "No active profile" : $"Active profile: {activeProfileId}";
     public string TrayText => string.IsNullOrWhiteSpace(activeProfileId) ? "No profile" : $"Profile: {activeProfileId}";
     public string ProcessText => $"{ActiveProfileText} - PID {Environment.ProcessId}";
@@ -353,24 +340,6 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         : $"Steam HID Bridge - {activeProfileId}";
 
     private string[] ReceiverProcesses => ParseReceiverProcesses(EditReceiverProcessesText);
-
-    private void SetActivity(string message, bool isError = false)
-    {
-        ApplyActivityMessage(message, isError);
-        AppLog.Write(message);
-    }
-
-    private void SetError(string message)
-    {
-        SetActivity(message, isError: true);
-    }
-
-    private void ApplyActivityMessage(string message, bool isError)
-    {
-        isActivityError = isError;
-        ActivityText = message;
-        OnPropertyChanged(nameof(ActivityIsError));
-    }
 
     private bool CanSaveOrLaunchProfile()
     {
@@ -393,7 +362,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private bool HasGeneralChanges()
     {
         return savedTheme != SelectedTheme
-            || !string.Equals(SerialPortSelection.Normalize(savedBoardPort), SerialPortSelection.Normalize(BoardPort), StringComparison.Ordinal)
+            || ParseBoardPort(savedBoardPort) != ParseBoardPort(BoardPort)
             || !string.Equals(savedSrmManifestPath, SrmManifestPath.Trim(), StringComparison.Ordinal);
     }
 
@@ -428,5 +397,21 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private string MouseButtonBrush(MouseButtons button)
     {
         return lastReport.MouseButtons.HasFlag(button) ? "SeaGreen" : "White";
+    }
+
+    private static void ShowError(string message)
+    {
+        _ = MessageBox.Show(message, "Steam HID Bridge", MessageBoxButton.OK, MessageBoxImage.Error);
+    }
+
+    private static void ShowInfo(string message)
+    {
+        _ = MessageBox.Show(message, "Steam HID Bridge", MessageBoxButton.OK, MessageBoxImage.Information);
+    }
+
+    private static int? ParseBoardPort(string value)
+    {
+        string trimmed = value.Trim();
+        return string.IsNullOrWhiteSpace(trimmed) ? null : int.TryParse(trimmed, out int portNumber) && portNumber > 0 ? portNumber : null;
     }
 }

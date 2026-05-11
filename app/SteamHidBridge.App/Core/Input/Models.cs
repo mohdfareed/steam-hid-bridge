@@ -1,27 +1,63 @@
+using SteamHidBridge.App.Configuration;
 using SteamHidBridge.Protocol;
 
 namespace SteamHidBridge.App.Core.Input;
 
-public interface IMouseInputConsumer
+internal interface IMouseInputConsumer
 {
     void Consume(MouseInputFrame frame);
 }
 
-public interface IOutputStatusProvider
+internal interface IOutputStatusProvider
 {
-    string StatusText { get; }
+    OutputStatus Status { get; }
 
     void Refresh();
 }
 
-public readonly record struct MouseInputFrame(
+internal readonly record struct MouseInputFrame(
     short PointerDeltaX,
     short PointerDeltaY,
     sbyte VerticalWheel,
     MouseButtons Buttons);
 
-public sealed record MouseInputStatistics(
+internal sealed record MouseInputStatistics(
     long EventCount,
     long PreviewCount,
     double EventsPerSecond,
     double PreviewFramesPerSecond);
+
+internal enum InputSourceState
+{
+    Inactive,
+    Starting,
+    Ready,
+    Error
+}
+
+internal readonly record struct InputSourceStatus(
+    InputSourceState State,
+    int ControllerCount = 0,
+    string? Detail = null);
+
+internal enum OutputConnectionState
+{
+    Idle,
+    Disconnected,
+    Connected,
+    Error
+}
+
+internal enum OutputError
+{
+    None,
+    FrameEncodeFailed,
+    WriteFailed,
+    UnknownMode
+}
+
+internal readonly record struct OutputStatus(
+    BridgeOutputMode Mode,
+    OutputConnectionState State,
+    string? Endpoint = null,
+    OutputError Error = OutputError.None);
