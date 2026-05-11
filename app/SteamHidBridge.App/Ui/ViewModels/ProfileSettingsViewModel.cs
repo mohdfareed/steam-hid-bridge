@@ -167,7 +167,7 @@ internal sealed class ProfileSettingsViewModel : ObservableObject
     }
 
     public string ProfileText => string.IsNullOrWhiteSpace(EditTitle) ? EditGameId : EditTitle;
-    public string ReceiverProcessesText => ReceiverProcesses.Length == 0 ? "None configured" : string.Join(", ", ReceiverProcesses);
+    public string ReceiverProcessesText => ReceiverProcesses.Length == 0 ? string.Empty : string.Join(", ", ReceiverProcesses);
 
     public Task LaunchRequestedProfileAsync()
     {
@@ -226,8 +226,7 @@ internal sealed class ProfileSettingsViewModel : ObservableObject
     private bool CanSaveOrLaunchProfile()
     {
         return !string.IsNullOrWhiteSpace(EditGameId)
-            && !string.IsNullOrWhiteSpace(EditExecutable)
-            && ReceiverProcesses.Length > 0;
+            && !string.IsNullOrWhiteSpace(EditExecutable);
     }
 
     private bool CanSaveProfile()
@@ -357,8 +356,9 @@ internal sealed class ProfileSettingsViewModel : ObservableObject
         };
     }
 
-    private static string[] ParseReceiverProcesses(string value)
+    private string[] ParseReceiverProcesses(string value)
     {
-        return value.Split('|', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        string[] processes = value.Split('|', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        return processes.Length == 0 ? [EditExecutable.Trim()] : processes;
     }
 }

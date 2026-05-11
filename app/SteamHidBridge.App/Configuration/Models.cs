@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using SteamHidBridge.App.Platform.App;
 
 namespace SteamHidBridge.App.Configuration;
 
@@ -53,7 +54,7 @@ internal sealed class GeneralSettings
 {
     public AppTheme Theme { get; set; } = AppTheme.System;
     public int? BoardPort { get; set; }
-    public string SrmManifestPath { get; set; } = "";
+    public string SrmManifestPath { get; set; } = AppDataPaths.SrmManifestPath;
 }
 
 internal sealed class AppSettings

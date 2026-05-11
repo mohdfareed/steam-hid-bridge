@@ -15,7 +15,7 @@ internal static class AppThemeManager
         {
             AppTheme.Light => ThemeMode.Light,
             AppTheme.Dark => ThemeMode.Dark,
-            AppTheme.System => throw new NotImplementedException(),
+            AppTheme.System => ThemeMode.System,
             _ => ThemeMode.System
         };
 #pragma warning restore WPF0001

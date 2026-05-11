@@ -29,19 +29,7 @@ internal static class AppSettingsFile
 
         try
         {
-            AppSettings settings = JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(path), JsonOptions) ?? new AppSettings();
-            settings.General ??= new GeneralSettings();
-            settings.Games ??= [];
-            settings.General.SrmManifestPath = string.IsNullOrWhiteSpace(settings.General.SrmManifestPath)
-                ? AppDataPaths.SrmManifestPath
-                : settings.General.SrmManifestPath;
-
-            foreach (GameProfile game in settings.Games.Values)
-            {
-                game.ReceiverProcesses ??= [];
-            }
-
-            return settings;
+            return JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(path), JsonOptions) ?? new();
         }
         catch (Exception ex) when (ex is JsonException or NotSupportedException)
         {

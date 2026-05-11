@@ -52,13 +52,6 @@
                            VerticalAlignment="Center"
                            Foreground="{DynamicResource {x:Static SystemColors.GrayTextBrushKey}}"/>
                 <StatusBarItem>
-                    <TextBlock Text="{Binding Output.InputSourceText}"/>
-                </StatusBarItem>
-                <TextBlock Text="|"
-                           Margin="4,0"
-                           VerticalAlignment="Center"
-                           Foreground="{DynamicResource {x:Static SystemColors.GrayTextBrushKey}}"/>
-                <StatusBarItem>
                     <TextBlock Text="{Binding Output.OutputTargetText}"/>
                 </StatusBarItem>
             </StatusBar>

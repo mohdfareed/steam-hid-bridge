@@ -31,19 +31,19 @@ internal sealed class GeneralSettingsViewModel : ObservableObject
         this.applyTheme = applyTheme;
         this.confirmUpdate = confirmUpdate;
 
-        SrmManifestPath = appService.SrmManifestPath;
-        BoardPort = appService.BoardPort?.ToString() ?? string.Empty;
-        SelectedTheme = appService.Theme;
-        savedTheme = SelectedTheme;
-        savedSrmManifestPath = SrmManifestPath.Trim();
-        savedBoardPort = BoardPort.Trim();
-
         saveGeneralCommand = new AsyncRelayCommand(SaveGeneralAsync, HasChanges);
         SaveGeneralCommand = saveGeneralCommand;
         ExportSrmManifestCommand = new AsyncRelayCommand(ExportSrmManifestAsync);
         UpdateFirmwareCommand = new AsyncRelayCommand(UpdateFirmwareAsync);
         CheckForUpdateCommand = new AsyncRelayCommand(CheckForUpdateAsync);
         OpenAppDataCommand = new AsyncRelayCommand(OpenAppDataAsync);
+
+        SrmManifestPath = appService.SrmManifestPath;
+        BoardPort = appService.BoardPort?.ToString() ?? string.Empty;
+        SelectedTheme = appService.Theme;
+        savedTheme = SelectedTheme;
+        savedSrmManifestPath = SrmManifestPath.Trim();
+        savedBoardPort = BoardPort.Trim();
     }
 
     public event Action<int>? ExitRequested;
@@ -157,7 +157,6 @@ internal sealed class GeneralSettingsViewModel : ObservableObject
         try
         {
             await appService.UpdateFirmwareAsync().ConfigureAwait(true);
-            UserDialogs.ShowInfo("Board firmware update started.");
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
         {

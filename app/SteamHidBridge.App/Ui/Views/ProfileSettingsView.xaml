@@ -13,6 +13,7 @@
         <RowDefinition Height="Auto"/>
         <RowDefinition Height="Auto"/>
         <RowDefinition Height="Auto"/>
+        <RowDefinition Height="Auto"/>
       </Grid.RowDefinitions>
       <Grid.ColumnDefinitions>
         <ColumnDefinition Width="120"/>
@@ -23,7 +24,6 @@
       <TextBlock Text="Entry"
                  VerticalAlignment="Center"/>
       <ComboBox Grid.Column="1"
-                Margin="0,0,8,0"
                 ItemsSource="{Binding GameIds}"
                 SelectedItem="{Binding SelectedGameId}"
                 ToolTip="Select a saved profile."/>
@@ -103,7 +103,7 @@
                 ToolTip="Choose no output or board physical mouse output."/>
 
       <TextBlock Grid.Row="7"
-                 Text="Receivers *"
+                 Text="Receivers"
                  Margin="0,8,0,0"
                  VerticalAlignment="Center"/>
       <TextBox Grid.Row="7"

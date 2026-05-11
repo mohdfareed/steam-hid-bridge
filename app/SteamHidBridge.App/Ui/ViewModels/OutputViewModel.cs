@@ -15,24 +15,6 @@ internal sealed class OutputViewModel : ObservableObject
         private set => SetProperty(ref field, value);
     } = "Forwarding off";
 
-    public string LastOutputText
-    {
-        get;
-        private set => SetProperty(ref field, value);
-    } = "No output yet";
-
-    public string InputLoopText
-    {
-        get;
-        private set => SetProperty(ref field, value);
-    } = "Listening for virtual mouse input.";
-
-    public string InputSourceText
-    {
-        get;
-        private set => SetProperty(ref field, value);
-    } = "Virtual mouse input";
-
     public string OutputTargetText
     {
         get;
@@ -65,8 +47,6 @@ internal sealed class OutputViewModel : ObservableObject
             frame.VerticalWheel,
             frame.Buttons);
 
-        InputLoopText = "Mouse input received.";
-        LastOutputText = $"mouse dx={lastReport.PointerDeltaX}, dy={lastReport.PointerDeltaY}, wheel={lastReport.VerticalWheel}, buttons={lastReport.MouseButtons}";
         OnPropertyChanged(nameof(PointerText));
         OnPropertyChanged(nameof(WheelText));
         OnPropertyChanged(nameof(MouseButtonsText));
