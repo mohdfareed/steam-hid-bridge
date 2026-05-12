@@ -18,7 +18,7 @@
       <Grid.ColumnDefinitions>
         <ColumnDefinition Width="120"/>
         <ColumnDefinition Width="*"/>
-        <ColumnDefinition Width="132"/>
+        <ColumnDefinition Width="Auto"/>
       </Grid.ColumnDefinitions>
 
       <TextBlock Text="Entry"
@@ -29,6 +29,8 @@
                 SelectedItem="{Binding SelectedGameId}"
                 ToolTip="Select a saved profile."/>
       <Button Grid.Column="2"
+              MinWidth="96"
+              HorizontalAlignment="Right"
               Content="New"
               Command="{Binding NewGameCommand}"
               ToolTip="Create a new profile."/>

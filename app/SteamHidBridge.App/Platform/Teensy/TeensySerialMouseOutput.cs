@@ -8,7 +8,7 @@ using SteamHidBridge.Protocol;
 
 namespace SteamHidBridge.App.Platform.Teensy;
 
-internal sealed class TeensySerialMouseOutput(int? port) : IDisposable
+internal sealed class TeensySerialMouseOutput(int? port) : IMouseOutputTarget
 {
     private const int BaudRate = 115200;
     private static readonly TimeSpan ReconnectInterval = TimeSpan.FromSeconds(1);
@@ -52,7 +52,7 @@ internal sealed class TeensySerialMouseOutput(int? port) : IDisposable
         }
     }
 
-    public void Consume(MouseInputFrame frame)
+    public void WriteFrame(MouseInputFrame frame)
     {
         lock (syncLock)
         {
@@ -97,7 +97,7 @@ internal sealed class TeensySerialMouseOutput(int? port) : IDisposable
 
     public void ResetState()
     {
-        Consume(new MouseInputFrame(0, 0, 0, MouseButtons.None));
+        WriteFrame(new MouseInputFrame(0, 0, 0, MouseButtons.None));
     }
 
     public void Dispose()

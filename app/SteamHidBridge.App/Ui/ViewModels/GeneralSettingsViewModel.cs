@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
@@ -24,6 +25,7 @@ internal sealed class GeneralSettingsViewModel : ObservableObject
     private string savedViiperHost = string.Empty;
     private string savedViiperPort = string.Empty;
     private string savedSrmManifestPath = string.Empty;
+    private int viiperCheckVersion;
 
     public GeneralSettingsViewModel(
         BridgeAppService appService,
@@ -40,7 +42,6 @@ internal sealed class GeneralSettingsViewModel : ObservableObject
 
         SaveGeneralCommand = new AsyncRelayCommand(SaveGeneralAsync);
         ExportSrmManifestCommand = new AsyncRelayCommand(ExportSrmManifestAsync);
-        CheckViiperCommand = new AsyncRelayCommand(CheckViiperAsync);
         UpdateFirmwareCommand = new AsyncRelayCommand(UpdateFirmwareAsync);
         CheckForUpdateCommand = new AsyncRelayCommand(CheckForUpdateAsync);
         OpenAppDataCommand = new AsyncRelayCommand(OpenAppDataAsync);
@@ -55,6 +56,7 @@ internal sealed class GeneralSettingsViewModel : ObservableObject
         savedViiperHost = ViiperHost.Trim();
         savedViiperPort = ViiperPort.Trim();
         savedSrmManifestPath = SrmManifestPath.Trim();
+        QueueViiperCheck();
     }
 
     public event Action<int>? ExitRequested;
@@ -63,7 +65,6 @@ internal sealed class GeneralSettingsViewModel : ObservableObject
 
     public ICommand SaveGeneralCommand { get; }
     public ICommand ExportSrmManifestCommand { get; }
-    public ICommand CheckViiperCommand { get; }
     public ICommand UpdateFirmwareCommand { get; }
     public ICommand CheckForUpdateCommand { get; }
     public ICommand OpenAppDataCommand { get; }
@@ -71,7 +72,7 @@ internal sealed class GeneralSettingsViewModel : ObservableObject
     public static string AppDataPath => BridgeAppService.AppDataPath;
     public string VersionText => appService.VersionText;
     public string BoardFirmwareText => appService.HasBundledFirmware
-        ? "Flash the packaged firmware to update the board."
+        ? "Press program button on the board and click Flash to update firmware."
         : "Firmware package is missing.";
     public FontWeight SaveFontWeight => HasUnsavedChanges ? FontWeights.Bold : FontWeights.Normal;
     public static Brush SaveErrorBrush => Brushes.IndianRed;
@@ -150,6 +151,7 @@ internal sealed class GeneralSettingsViewModel : ObservableObject
             if (SetProperty(ref field, value))
             {
                 ResetViiperStatus();
+                QueueViiperCheck();
                 OnEditChanged();
             }
         }
@@ -163,6 +165,7 @@ internal sealed class GeneralSettingsViewModel : ObservableObject
             if (SetProperty(ref field, value))
             {
                 ResetViiperStatus();
+                QueueViiperCheck();
                 OnEditChanged();
             }
         }
@@ -171,6 +174,7 @@ internal sealed class GeneralSettingsViewModel : ObservableObject
     public void ApplySessionStatus(BridgeSessionStatus status)
     {
         ApplyBoardStatus(status.BoardOutput);
+        ApplyViiperStatus(status.ViiperOutput);
     }
 
     private Task SaveGeneralAsync()
@@ -220,27 +224,10 @@ internal sealed class GeneralSettingsViewModel : ObservableObject
         return Task.CompletedTask;
     }
 
-    private async Task CheckViiperAsync()
+    private void QueueViiperCheck()
     {
-        string host = ViiperHost.Trim();
-        int? port = ParseRequiredPort(ViiperPort);
-        if (string.IsNullOrWhiteSpace(host) || port is null)
-        {
-            UserDialogs.ShowError("Enter a valid VIIPER host and port first.");
-            return;
-        }
-
-        try
-        {
-            await BridgeAppService.CheckViiperAsync(host, port.Value).ConfigureAwait(true);
-            ViiperStatusBrush = Brushes.SeaGreen;
-            ViiperStatusToolTip = $"Connected to {host}:{port.Value}.";
-        }
-        catch (Exception ex)
-        {
-            ViiperStatusBrush = Brushes.IndianRed;
-            ViiperStatusToolTip = $"Could not reach {host}:{port.Value}. {ex.Message}";
-        }
+        int version = Interlocked.Increment(ref viiperCheckVersion);
+        _ = CheckViiperAsync(version);
     }
 
     private async Task UpdateFirmwareAsync()
@@ -303,7 +290,43 @@ internal sealed class GeneralSettingsViewModel : ObservableObject
     private void ResetViiperStatus()
     {
         ViiperStatusBrush = Brushes.Gray;
-        ViiperStatusToolTip = "Not checked yet.";
+        ViiperStatusToolTip = "Checking...";
+    }
+
+    private async Task CheckViiperAsync(int version)
+    {
+        string host = ViiperHost.Trim();
+        int? port = ParseRequiredPort(ViiperPort);
+        if (string.IsNullOrWhiteSpace(host) || port is null)
+        {
+            ViiperStatusBrush = Brushes.Gray;
+            ViiperStatusToolTip = "Enter a valid host and port.";
+            return;
+        }
+
+        try
+        {
+            await Task.Delay(300).ConfigureAwait(true);
+            if (version != viiperCheckVersion)
+            {
+                return;
+            }
+
+            await BridgeAppService.CheckViiperAsync(host, port.Value).ConfigureAwait(true);
+            if (version == viiperCheckVersion)
+            {
+                ViiperStatusBrush = Brushes.SeaGreen;
+                ViiperStatusToolTip = $"Connected to {host}:{port.Value}.";
+            }
+        }
+        catch (Exception ex)
+        {
+            if (version == viiperCheckVersion)
+            {
+                ViiperStatusBrush = Brushes.IndianRed;
+                ViiperStatusToolTip = $"Could not reach {host}:{port.Value}. {ex.Message}";
+            }
+        }
     }
 
     private bool TryApplyGeneralSettings(out string? error)
@@ -370,6 +393,30 @@ internal sealed class GeneralSettingsViewModel : ObservableObject
             default:
                 BoardStatusBrush = Brushes.Gray;
                 BoardStatusToolTip = "Not connected.";
+                break;
+        }
+    }
+
+    private void ApplyViiperStatus(OutputStatus status)
+    {
+        switch (status.State)
+        {
+            case OutputConnectionState.Connected:
+                ViiperStatusBrush = Brushes.SeaGreen;
+                ViiperStatusToolTip = string.IsNullOrWhiteSpace(status.Endpoint)
+                    ? "Connected."
+                    : $"Connected: {status.Endpoint}.";
+                break;
+            case OutputConnectionState.Error:
+            case OutputConnectionState.Disconnected:
+                ViiperStatusBrush = Brushes.IndianRed;
+                ViiperStatusToolTip = string.IsNullOrWhiteSpace(status.Endpoint)
+                    ? "Not connected."
+                    : $"Not connected: {status.Endpoint}.";
+                break;
+            case OutputConnectionState.Idle:
+                break;
+            default:
                 break;
         }
     }

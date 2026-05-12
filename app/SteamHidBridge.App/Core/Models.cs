@@ -1,3 +1,4 @@
+using System;
 using SteamHidBridge.Protocol;
 
 namespace SteamHidBridge.App.Core;
@@ -29,3 +30,11 @@ internal readonly record struct OutputStatus(
     string? Endpoint = null,
     OutputError Error = OutputError.None,
     MouseInputFrame? LastFrame = null);
+
+internal interface IMouseOutputTarget : IDisposable
+{
+    OutputStatus GetStatus();
+    void Refresh();
+    void WriteFrame(MouseInputFrame frame);
+    void ResetState();
+}

@@ -1,3 +1,5 @@
+using System.Threading;
+using System.Windows.Threading;
 using SteamHidBridge.App.Configuration;
 using SteamHidBridge.App.Core;
 using SteamHidBridge.Protocol;
@@ -6,7 +8,11 @@ namespace SteamHidBridge.App.Ui.ViewModels;
 
 internal sealed class OutputViewModel : ObservableObject
 {
+    private readonly Lock previewLock = new();
+    private Dispatcher? previewDispatcher;
     private HidInputReport lastReport;
+    private MouseInputFrame latestPreviewFrame;
+    private bool previewScheduled;
 
     public string ForwardingText
     {
@@ -59,6 +65,58 @@ internal sealed class OutputViewModel : ObservableObject
         OnPropertyChanged(nameof(MouseForwardBrush));
     }
 
+    public void QueuePreviewMouseInput(Dispatcher dispatcher, MouseInputFrame frame)
+    {
+        bool schedule;
+        lock (previewLock)
+        {
+            previewDispatcher = dispatcher;
+            latestPreviewFrame = frame;
+            schedule = !previewScheduled;
+            if (schedule)
+            {
+                previewScheduled = true;
+            }
+        }
+
+        if (schedule)
+        {
+            _ = dispatcher.BeginInvoke(FlushPreview, DispatcherPriority.Background);
+        }
+    }
+
+    private void FlushPreview()
+    {
+        Dispatcher? dispatcher;
+        MouseInputFrame frame;
+        lock (previewLock)
+        {
+            dispatcher = previewDispatcher;
+            frame = latestPreviewFrame;
+        }
+
+        PreviewMouseInput(frame);
+
+        bool reschedule;
+        lock (previewLock)
+        {
+            if (frame.Equals(latestPreviewFrame))
+            {
+                previewScheduled = false;
+                reschedule = false;
+            }
+            else
+            {
+                reschedule = true;
+            }
+        }
+
+        if (reschedule)
+        {
+            _ = dispatcher?.BeginInvoke(FlushPreview, DispatcherPriority.Background);
+        }
+    }
+
     private string MouseButtonBrush(MouseButtons button)
     {
         return lastReport.MouseButtons.HasFlag(button) ? "SeaGreen" : "White";
@@ -90,7 +148,7 @@ internal sealed class OutputViewModel : ObservableObject
             },
             BridgeOutputMode.Viiper => viiperStatus.State switch
             {
-                OutputConnectionState.Connected => $"Virtual mouse connected: {viiperStatus.Endpoint}",
+                OutputConnectionState.Connected => $"Virtual mouse connected at {viiperStatus.Endpoint}",
                 OutputConnectionState.Error => viiperStatus.Error switch
                 {
                     OutputError.ConnectFailed => $"Virtual mouse unavailable: {viiperStatus.Endpoint}",

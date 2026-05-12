@@ -78,18 +78,13 @@
                                         </StackPanel>
                                         <TextBox Grid.Row="3"
                                                  Grid.Column="1"
-                                                 Margin="0,8,8,0"
+                                                 Grid.ColumnSpan="2"
+                                                 Margin="0,8,0,0"
                                                  InputScope="Number"
                                                  Text="{Binding ViiperPort, UpdateSourceTrigger=PropertyChanged}"
                                                  PreviewTextInput="BoardPort_PreviewTextInput"
                                                  DataObject.Pasting="BoardPort_Pasting"
                                                  ToolTip="Port for the VIIPER server API."/>
-                                        <Button Grid.Row="3"
-                                                Grid.Column="2"
-                                                Content="Check"
-                                                Margin="0,8,0,0"
-                                                Command="{Binding CheckViiperCommand}"
-                                                ToolTip="Check whether the configured VIIPER server is reachable."/>
                                 </Grid>
                         </GroupBox>
 

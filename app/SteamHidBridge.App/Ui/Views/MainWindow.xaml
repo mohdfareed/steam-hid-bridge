@@ -9,7 +9,7 @@
         Icon="/Assets/SteamHidBridge.ico"
         Width="900"
         Height="660"
-        MinWidth="760"
+        MinWidth="840"
         MinHeight="500"
         Topmost="True"
         ShowActivated="False"

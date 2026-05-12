@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using System.Threading;
+using System.Threading.Channels;
 using System.Threading.Tasks;
 using SteamHidBridge.App.Configuration;
 using SteamHidBridge.App.Platform;
@@ -19,22 +20,31 @@ internal sealed record BridgeSessionStatus(
 internal sealed class BridgeSession : IDisposable
 {
     private static readonly TimeSpan StatusInterval = TimeSpan.FromMilliseconds(250);
+    private readonly Lock syncLock = new();
     private readonly TeensySerialMouseOutput boardOutput;
     private readonly ViiperMouseOutput viiperOutput;
     private readonly SessionProcessMonitor processMonitor;
     private readonly SteamInputConfigForcer steamInputConfigForcer = new();
+    private readonly Channel<QueuedOutput> outputQueue = Channel.CreateUnbounded<QueuedOutput>(new UnboundedChannelOptions
+    {
+        SingleReader = true,
+        SingleWriter = false
+    });
     private readonly CancellationTokenSource cancellation = new();
+    private readonly Task outputTask;
     private readonly Task statusTask;
     private bool isDisposed;
     private bool hasRequestedExit;
     private bool isForwarding;
+    private long outputGeneration;
     private BridgeOutputMode outputMode = BridgeOutputMode.Board;
 
-    public BridgeSession(int? boardPort, string viiperHost, int viiperPort)
+    public BridgeSession(int? boardPort, string viiperHost, int viiperPort, bool exitWithOwnedLaunch)
     {
-        processMonitor = new SessionProcessMonitor();
+        processMonitor = new SessionProcessMonitor(exitWithOwnedLaunch);
         boardOutput = new TeensySerialMouseOutput(boardPort);
         viiperOutput = new ViiperMouseOutput(viiperHost, viiperPort);
+        outputTask = Task.Run(RunOutputLoopAsync);
         statusTask = Task.Run(RunStatusLoopAsync);
     }
 
@@ -44,28 +54,42 @@ internal sealed class BridgeSession : IDisposable
 
     public void PublishMouseInput(MouseInputFrame frame)
     {
-        if (isForwarding && outputMode == BridgeOutputMode.Board)
+        BridgeOutputMode queuedMode;
+        long queuedGeneration;
+
+        lock (syncLock)
         {
-            boardOutput.Consume(frame);
-        }
-        else if (isForwarding && outputMode == BridgeOutputMode.Viiper)
-        {
-            viiperOutput.Consume(frame);
+            if (!isForwarding || outputMode == BridgeOutputMode.None)
+            {
+                MouseInput?.Invoke(frame);
+                return;
+            }
+
+            queuedMode = outputMode;
+            queuedGeneration = outputGeneration;
         }
 
+        _ = outputQueue.Writer.TryWrite(new QueuedOutput(queuedMode, queuedGeneration, frame));
         MouseInput?.Invoke(frame);
     }
 
     public void SetOutputMode(BridgeOutputMode value)
     {
-        if (outputMode == value)
+        BridgeOutputMode previousMode;
+        lock (syncLock)
         {
-            PublishStatus();
-            return;
+            if (outputMode == value)
+            {
+                PublishStatus();
+                return;
+            }
+
+            previousMode = outputMode;
+            outputMode = value;
+            outputGeneration++;
         }
 
-        ResetOutputState(outputMode);
-        outputMode = value;
+        ResetOutputState(previousMode);
         viiperOutput.SetEnabled(value == BridgeOutputMode.Viiper);
         PublishStatus();
     }
@@ -105,6 +129,17 @@ internal sealed class BridgeSession : IDisposable
         cancellation.Cancel();
         try
         {
+            _ = outputTask.Wait(TimeSpan.FromSeconds(1));
+        }
+        catch (AggregateException ex) when (ex.InnerExceptions.All(static exception => exception is OperationCanceledException))
+        {
+        }
+        catch (AggregateException)
+        {
+        }
+
+        try
+        {
             _ = statusTask.Wait(TimeSpan.FromSeconds(1));
         }
         catch (AggregateException ex) when (ex.InnerExceptions.All(static exception => exception is OperationCanceledException))
@@ -119,6 +154,24 @@ internal sealed class BridgeSession : IDisposable
         boardOutput.Dispose();
         viiperOutput.Dispose();
         cancellation.Dispose();
+    }
+
+    private async Task RunOutputLoopAsync()
+    {
+        try
+        {
+            while (await outputQueue.Reader.WaitToReadAsync(cancellation.Token).ConfigureAwait(false))
+            {
+                while (outputQueue.Reader.TryRead(out QueuedOutput queued))
+                {
+                    IMouseOutputTarget? target = GetQueuedTarget(queued);
+                    target?.WriteFrame(queued.Frame);
+                }
+            }
+        }
+        catch (OperationCanceledException)
+        {
+        }
     }
 
     private async Task RunStatusLoopAsync()
@@ -137,14 +190,7 @@ internal sealed class BridgeSession : IDisposable
             return;
         }
 
-        if (outputMode == BridgeOutputMode.Board)
-        {
-            boardOutput.Refresh();
-        }
-        else if (outputMode == BridgeOutputMode.Viiper)
-        {
-            viiperOutput.Refresh();
-        }
+        CurrentTarget()?.Refresh();
 
         ReceiverState receiverState = processMonitor.Refresh();
         if (receiverState.ShouldExit)
@@ -160,22 +206,42 @@ internal sealed class BridgeSession : IDisposable
 
     private void PublishStatus()
     {
+        bool forwardingEnabled;
+        BridgeOutputMode currentMode;
+        lock (syncLock)
+        {
+            forwardingEnabled = isForwarding;
+            currentMode = outputMode;
+        }
+
         StatusChanged?.Invoke(new BridgeSessionStatus(
-            isForwarding,
+            forwardingEnabled,
             processMonitor.HasRunningLaunch,
-            outputMode,
+            currentMode,
             boardOutput.GetStatus(),
             viiperOutput.GetStatus()));
     }
 
     private void SetForwarding(bool value)
     {
-        if (isForwarding && !value)
+        BridgeOutputMode modeToReset;
+        bool reset;
+        lock (syncLock)
         {
-            ResetOutputState(outputMode);
+            reset = isForwarding && !value;
+            modeToReset = outputMode;
+            isForwarding = value;
+            if (reset)
+            {
+                outputGeneration++;
+            }
         }
 
-        isForwarding = value;
+        if (reset)
+        {
+            ResetOutputState(modeToReset);
+        }
+
         _ = steamInputConfigForcer.TrySetForced(value);
     }
 
@@ -201,4 +267,36 @@ internal sealed class BridgeSession : IDisposable
         hasRequestedExit = true;
         ExitRequested?.Invoke(0);
     }
+
+    private IMouseOutputTarget? CurrentTarget()
+    {
+        lock (syncLock)
+        {
+            return outputMode switch
+            {
+                BridgeOutputMode.Board => boardOutput,
+                BridgeOutputMode.Viiper => viiperOutput,
+                BridgeOutputMode.None => throw new NotImplementedException(),
+                _ => null
+            };
+        }
+    }
+
+    private IMouseOutputTarget? GetQueuedTarget(QueuedOutput queued)
+    {
+        lock (syncLock)
+        {
+            return isDisposed || queued.Generation != outputGeneration || queued.Mode != outputMode
+                ? null
+                : queued.Mode switch
+                {
+                    BridgeOutputMode.Board => boardOutput,
+                    BridgeOutputMode.Viiper => viiperOutput,
+                    BridgeOutputMode.None => throw new NotImplementedException(),
+                    _ => null
+                };
+        }
+    }
+
+    private readonly record struct QueuedOutput(BridgeOutputMode Mode, long Generation, MouseInputFrame Frame);
 }

@@ -1,7 +1,6 @@
 using System;
 using System.Diagnostics;
 using System.IO;
-using System.Threading;
 using System.Windows;
 using System.Windows.Threading;
 using SteamHidBridge.App.Configuration;
@@ -163,7 +162,11 @@ public partial class App : Application
         AppThemeManager.Apply(settings.General.Theme);
 
         BridgeAppService appService = new(settings);
-        BridgeSession session = new(appService.BoardPort, appService.ViiperHost, appService.ViiperPort);
+        BridgeSession session = new(
+            appService.BoardPort,
+            appService.ViiperHost,
+            appService.ViiperPort,
+            !string.IsNullOrWhiteSpace(launchOptions.ProfileId));
         ProfileSettingsViewModel profileSettingsViewModel = new(appService, session, launchOptions.ProfileId);
         GeneralSettingsViewModel generalSettingsViewModel = new(
             appService,
@@ -192,58 +195,7 @@ public partial class App : Application
         ProfileSettingsViewModel profileSettingsViewModel,
         GeneralSettingsViewModel generalSettingsViewModel)
     {
-        Lock previewLock = new();
-        MouseInputFrame latestPreviewFrame = default;
-        bool previewScheduled = false;
-
-        void FlushPreview()
-        {
-            MouseInputFrame frame;
-            lock (previewLock)
-            {
-                frame = latestPreviewFrame;
-            }
-
-            outputViewModel.PreviewMouseInput(frame);
-
-            bool reschedule;
-            lock (previewLock)
-            {
-                if (frame.Equals(latestPreviewFrame))
-                {
-                    previewScheduled = false;
-                    reschedule = false;
-                }
-                else
-                {
-                    reschedule = true;
-                }
-            }
-
-            if (reschedule)
-            {
-                _ = Dispatcher.BeginInvoke(FlushPreview, DispatcherPriority.Background);
-            }
-        }
-
-        session.MouseInput += frame =>
-        {
-            bool schedule;
-            lock (previewLock)
-            {
-                latestPreviewFrame = frame;
-                schedule = !previewScheduled;
-                if (schedule)
-                {
-                    previewScheduled = true;
-                }
-            }
-
-            if (schedule)
-            {
-                _ = Dispatcher.BeginInvoke(FlushPreview, DispatcherPriority.Background);
-            }
-        };
+        session.MouseInput += frame => outputViewModel.QueuePreviewMouseInput(Dispatcher, frame);
         session.StatusChanged += status => Dispatcher.BeginInvoke(() =>
         {
             outputViewModel.ApplyRuntimeStatus(status);
