@@ -8,7 +8,7 @@ namespace SteamHidBridge.App.Core;
 
 internal readonly record struct ReceiverState(bool ShouldForward, bool ShouldExit);
 
-internal sealed class SessionProcessMonitor(bool exitWithOwnedLaunch) : IDisposable
+internal sealed class SessionProcessMonitor(bool exitWithOwnedLaunch, bool bypassReceiverGate) : IDisposable
 {
     private readonly Lock syncLock = new();
     private readonly GameProcessHost gameProcessHost = new();
@@ -51,6 +51,13 @@ internal sealed class SessionProcessMonitor(bool exitWithOwnedLaunch) : IDisposa
 
     public ReceiverState Refresh()
     {
+        if (bypassReceiverGate)
+        {
+            return new ReceiverState(
+                true,
+                exitWithOwnedLaunch && HasRunningLaunch && gameProcessHost.HasExited);
+        }
+
         string[] receivers = GetReceivers();
         if (receivers.Length == 0)
         {

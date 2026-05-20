@@ -1,8 +1,11 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.IO.Ports;
+using System.Linq;
 using System.Threading;
+using Microsoft.Win32;
 using SteamHidBridge.App.Core;
 using SteamHidBridge.Protocol;
 
@@ -161,7 +164,62 @@ internal sealed class TeensySerialMouseOutput(int? port) : IMouseOutputTarget
 
         string[] ports = SerialPort.GetPortNames();
         Array.Sort(ports, StringComparer.OrdinalIgnoreCase);
-        return ports;
+        string[] teensyPorts = FindLikelyTeensyPorts();
+        if (teensyPorts.Length == 0)
+        {
+            return ports;
+        }
+
+        List<string> ordered = [.. teensyPorts];
+        foreach (string port in ports)
+        {
+            if (!ordered.Contains(port, StringComparer.OrdinalIgnoreCase))
+            {
+                ordered.Add(port);
+            }
+        }
+
+        return [.. ordered];
+    }
+
+    private static string[] FindLikelyTeensyPorts()
+    {
+        const string enumPath = @"SYSTEM\CurrentControlSet\Enum\USB";
+        using RegistryKey? root = Registry.LocalMachine.OpenSubKey(enumPath);
+        if (root is null)
+        {
+            return [];
+        }
+
+        HashSet<string> ports = new(StringComparer.OrdinalIgnoreCase);
+        foreach (string vendorKeyName in root.GetSubKeyNames())
+        {
+            if (!vendorKeyName.Contains("VID_16C0", StringComparison.OrdinalIgnoreCase)
+                && !vendorKeyName.Contains("TEENSY", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            using RegistryKey? vendorKey = root.OpenSubKey(vendorKeyName);
+            if (vendorKey is null)
+            {
+                continue;
+            }
+
+            foreach (string instanceKeyName in vendorKey.GetSubKeyNames())
+            {
+                using RegistryKey? instanceKey = vendorKey.OpenSubKey(instanceKeyName);
+                using RegistryKey? deviceParameters = instanceKey?.OpenSubKey("Device Parameters");
+                if (deviceParameters?.GetValue("PortName") is string portName && !string.IsNullOrWhiteSpace(portName))
+                {
+                    _ = ports.Add(portName.Trim());
+                }
+            }
+        }
+
+        string[] resolved = [.. ports];
+        Array.Sort(resolved, StringComparer.OrdinalIgnoreCase);
+        return resolved;
     }
 
     private void ClosePort()

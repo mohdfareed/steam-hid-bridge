@@ -1,4 +1,6 @@
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
+using SteamHidBridge.App.Ui.ViewModels;
 
 namespace SteamHidBridge.App.Ui.Views;
 
@@ -13,5 +15,57 @@ public partial class OutputView : UserControl
     public OutputView()
     {
         InitializeComponent();
+    }
+
+    private void MoveBoard_Click(object sender, System.Windows.RoutedEventArgs e)
+    {
+        if (DataContext is not OutputViewModel viewModel || sender is not ButtonBase { Tag: string tag })
+        {
+            return;
+        }
+
+        string[] parts = tag.Split(',');
+        if (parts.Length != 2
+            || !short.TryParse(parts[0], out short deltaX)
+            || !short.TryParse(parts[1], out short deltaY))
+        {
+            return;
+        }
+
+        viewModel.MoveBoard(deltaX, deltaY);
+    }
+
+    private void WheelBoard_Click(object sender, System.Windows.RoutedEventArgs e)
+    {
+        if (DataContext is not OutputViewModel viewModel || sender is not ButtonBase { Tag: string tag } || !sbyte.TryParse(tag, out sbyte wheel))
+        {
+            return;
+        }
+
+        viewModel.WheelBoard(wheel);
+    }
+
+    private void ReleaseButtons_Click(object sender, System.Windows.RoutedEventArgs e)
+    {
+        if (DataContext is OutputViewModel viewModel)
+        {
+            viewModel.ClearManualButtons();
+        }
+    }
+
+    private void PinNextInput_Click(object sender, System.Windows.RoutedEventArgs e)
+    {
+        if (DataContext is OutputViewModel viewModel)
+        {
+            viewModel.RequestPinNextInput();
+        }
+    }
+
+    private void ClearInputPin_Click(object sender, System.Windows.RoutedEventArgs e)
+    {
+        if (DataContext is OutputViewModel viewModel)
+        {
+            viewModel.ClearInputPin();
+        }
     }
 }

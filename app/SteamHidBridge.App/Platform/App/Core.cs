@@ -6,11 +6,12 @@ using System.Windows.Input;
 
 namespace SteamHidBridge.App.Platform.App;
 
-internal sealed record BridgeLaunchOptions(string ProfileId)
+internal sealed record BridgeLaunchOptions(string ProfileId, bool TestBench)
 {
     public static BridgeLaunchOptions Parse(string[] args)
     {
         string profileId = string.Empty;
+        bool testBench = false;
 
         for (int index = 0; index < args.Length; index++)
         {
@@ -26,9 +27,16 @@ internal sealed record BridgeLaunchOptions(string ProfileId)
                 profileId = profileValue.Trim();
                 continue;
             }
+
+            if (string.Equals(args[index], "--test-bench", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(args[index], "--testbench", StringComparison.OrdinalIgnoreCase))
+            {
+                testBench = true;
+                continue;
+            }
         }
 
-        return new BridgeLaunchOptions(profileId);
+        return new BridgeLaunchOptions(profileId, testBench);
     }
 
     private static bool TryReadValue(string arg, string prefix, out string value)

@@ -72,7 +72,7 @@ internal sealed class GeneralSettingsViewModel : ObservableObject
     public static string AppDataPath => BridgeAppService.AppDataPath;
     public string VersionText => appService.VersionText;
     public string BoardFirmwareText => appService.HasBundledFirmware
-        ? "Press program button on the board and click Flash to update firmware."
+        ? "Click Flash to update the running board."
         : "Firmware package is missing.";
     public FontWeight SaveFontWeight => HasUnsavedChanges ? FontWeights.Bold : FontWeights.Normal;
     public static Brush SaveErrorBrush => Brushes.IndianRed;
@@ -389,6 +389,8 @@ internal sealed class GeneralSettingsViewModel : ObservableObject
                     : $"Not connected: {status.Endpoint}.";
                 break;
             case OutputConnectionState.Idle:
+                BoardStatusBrush = Brushes.Gray;
+                BoardStatusToolTip = "Not connected.";
                 break;
             default:
                 BoardStatusBrush = Brushes.Gray;
@@ -415,8 +417,12 @@ internal sealed class GeneralSettingsViewModel : ObservableObject
                     : $"Not connected: {status.Endpoint}.";
                 break;
             case OutputConnectionState.Idle:
+                ViiperStatusBrush = Brushes.Gray;
+                ViiperStatusToolTip = "Not checked yet.";
                 break;
             default:
+                ViiperStatusBrush = Brushes.Gray;
+                ViiperStatusToolTip = "Not checked yet.";
                 break;
         }
     }

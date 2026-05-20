@@ -42,7 +42,7 @@
                 <views:GeneralSettingsView Margin="12"
                                            DataContext="{Binding General}"/>
             </TabItem>
-            <TabItem Header="Output">
+            <TabItem Header="Diagnostics">
                 <views:OutputView Margin="12"
                                   DataContext="{Binding Output}"/>
             </TabItem>

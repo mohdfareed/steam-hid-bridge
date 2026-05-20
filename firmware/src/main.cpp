@@ -23,7 +23,11 @@ namespace
     uint16_t lastButtons = 0;
     uint32_t acceptedFrames = 0;
     uint32_t rejectedFrames = 0;
+    uint32_t bytesRead = 0;
+    uint32_t syncLosses = 0;
     uint32_t lastDiagnosticAt = 0;
+    uint32_t lastAcceptedAt = 0;
+    uint32_t lastRejectedAt = 0;
 
     uint16_t checksum16(const uint8_t *data, uint8_t length)
     {
@@ -129,6 +133,7 @@ namespace
         if (!validateFrame())
         {
             rejectedFrames++;
+            lastRejectedAt = millis();
             return;
         }
 
@@ -141,10 +146,16 @@ namespace
         emitButtonState(buttons);
         emitMove(deltaX, deltaY, wheel);
         acceptedFrames++;
+        lastAcceptedAt = millis();
     }
 
     void resetFrame(uint8_t firstByte)
     {
+        if (frameOffset > 0)
+        {
+            syncLosses++;
+        }
+
         frameOffset = 0;
         if (firstByte == Magic0)
         {
@@ -157,6 +168,7 @@ namespace
         while (Serial.available() > 0)
         {
             const uint8_t value = static_cast<uint8_t>(Serial.read());
+            bytesRead++;
 
             if (frameOffset == 0 && value != Magic0)
             {
@@ -181,6 +193,27 @@ namespace
         }
     }
 
+    void updateLed()
+    {
+        const uint32_t now = millis();
+        const bool acceptedRecently = now - lastAcceptedAt < 100;
+        const bool rejectedRecently = now - lastRejectedAt < 100;
+
+        if (acceptedRecently)
+        {
+            digitalWrite(LED_BUILTIN, HIGH);
+            return;
+        }
+
+        if (rejectedRecently)
+        {
+            digitalWrite(LED_BUILTIN, (now / 100) % 2 == 0 ? HIGH : LOW);
+            return;
+        }
+
+        digitalWrite(LED_BUILTIN, LOW);
+    }
+
     void writeDiagnostics()
     {
         const uint32_t now = millis();
@@ -193,17 +226,26 @@ namespace
         Serial.print("ok frames=");
         Serial.print(acceptedFrames);
         Serial.print(" rejected=");
-        Serial.println(rejectedFrames);
+        Serial.print(rejectedFrames);
+        Serial.print(" bytes=");
+        Serial.print(bytesRead);
+        Serial.print(" sync=");
+        Serial.print(syncLosses);
+        Serial.print(" offset=");
+        Serial.println(frameOffset);
     }
 }
 
 void setup()
 {
     Serial.begin(115200);
+    pinMode(LED_BUILTIN, OUTPUT);
+    digitalWrite(LED_BUILTIN, LOW);
 }
 
 void loop()
 {
     readSerialFrames();
+    updateLed();
     writeDiagnostics();
 }

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Runtime.InteropServices;
 using System.Windows;
@@ -8,12 +9,18 @@ using SteamHidBridge.Protocol;
 
 namespace SteamHidBridge.App.Platform.Windows;
 
+internal readonly record struct RawMouseObservation(
+    MouseInputFrame Frame,
+    nint Device,
+    string DeviceName);
+
 internal sealed partial class RawMouseInputWindowHook : IDisposable
 {
     private const int UsagePageGenericDesktop = 0x01;
     private const int UsageMouse = 0x02;
     private const int RawInputSink = 0x00000100;
     private const int Input = 0x10000003;
+    private const int DeviceName = 0x20000007;
     private const int MouseLeftButtonDown = 0x0001;
     private const int MouseLeftButtonUp = 0x0002;
     private const int MouseRightButtonDown = 0x0004;
@@ -27,14 +34,17 @@ internal sealed partial class RawMouseInputWindowHook : IDisposable
     private const int MouseWheel = 0x0400;
     private const int WheelDelta = 120;
 
-    private readonly Action<MouseInputFrame> onFrame;
+    private readonly Action<RawMouseObservation> onObservation;
+    private byte[] currentInputBuffer = [];
+    private byte[] bufferedInputBuffer = [];
+    private readonly Dictionary<nint, string> deviceNames = [];
     private HwndSource? source;
-    private MouseButtons buttons;
+    private readonly Dictionary<nint, MouseButtons> buttonStates = [];
     private bool isDisposed;
 
-    public RawMouseInputWindowHook(Window window, Action<MouseInputFrame> onFrame)
+    public RawMouseInputWindowHook(Window window, Action<RawMouseObservation> onObservation)
     {
-        this.onFrame = onFrame;
+        this.onObservation = onObservation;
         window.SourceInitialized += OnSourceInitialized;
     }
 
@@ -67,6 +77,7 @@ internal sealed partial class RawMouseInputWindowHook : IDisposable
         if (message == NativeMethods.WmInput)
         {
             ReadInput(lParam);
+            DrainBufferedInput();
         }
 
         return nint.Zero;
@@ -100,8 +111,12 @@ internal sealed partial class RawMouseInputWindowHook : IDisposable
             return;
         }
 
-        byte[] buffer = new byte[size];
-        GCHandle pinned = GCHandle.Alloc(buffer, GCHandleType.Pinned);
+        if (currentInputBuffer.Length < size)
+        {
+            currentInputBuffer = new byte[size];
+        }
+
+        GCHandle pinned = GCHandle.Alloc(currentInputBuffer, GCHandleType.Pinned);
         try
         {
             nint bufferPointer = pinned.AddrOfPinnedObject();
@@ -111,22 +126,108 @@ internal sealed partial class RawMouseInputWindowHook : IDisposable
                 return;
             }
 
-            RawInput rawInput = Marshal.PtrToStructure<RawInput>(bufferPointer);
-            RawMouse mouse = rawInput.Mouse;
-            MouseButtons nextButtons = UpdateButtons(buttons, mouse.ButtonFlags);
-            sbyte wheel = ReadWheel(mouse.ButtonFlags, mouse.ButtonData);
-
-            if (mouse.LastX == 0 && mouse.LastY == 0 && wheel == 0 && nextButtons == buttons)
-            {
-                return;
-            }
-
-            buttons = nextButtons;
-            onFrame(new MouseInputFrame(ClampToInt16(mouse.LastX), ClampToInt16(mouse.LastY), wheel, buttons));
+            ProcessRawInput(bufferPointer);
         }
         finally
         {
             pinned.Free();
+        }
+    }
+
+    private void DrainBufferedInput()
+    {
+        while (true)
+        {
+            uint size = 0;
+            uint result = NativeMethods.GetRawInputBuffer(nint.Zero, ref size, (uint)Marshal.SizeOf<RawInputHeader>());
+            if (result == uint.MaxValue || size == 0)
+            {
+                return;
+            }
+
+            if (bufferedInputBuffer.Length < size)
+            {
+                bufferedInputBuffer = new byte[size];
+            }
+
+            GCHandle pinned = GCHandle.Alloc(bufferedInputBuffer, GCHandleType.Pinned);
+            try
+            {
+                nint current = pinned.AddrOfPinnedObject();
+                uint bufferSize = size;
+                uint count = NativeMethods.GetRawInputBuffer(current, ref bufferSize, (uint)Marshal.SizeOf<RawInputHeader>());
+                if (count == uint.MaxValue)
+                {
+                    return;
+                }
+
+                for (uint index = 0; index < count; index++)
+                {
+                    ProcessRawInput(current);
+                    RawInput rawInput = Marshal.PtrToStructure<RawInput>(current);
+                    current += AlignRawInputSize(rawInput.Header.Size);
+                }
+            }
+            finally
+            {
+                pinned.Free();
+            }
+        }
+    }
+
+    private void ProcessRawInput(nint bufferPointer)
+    {
+        RawInput rawInput = Marshal.PtrToStructure<RawInput>(bufferPointer);
+        RawMouse mouse = rawInput.Mouse;
+        nint device = rawInput.Header.Device;
+        MouseButtons currentButtons = buttonStates.TryGetValue(device, out MouseButtons value) ? value : MouseButtons.None;
+        MouseButtons nextButtons = UpdateButtons(currentButtons, mouse.ButtonFlags);
+        sbyte wheel = ReadWheel(mouse.ButtonFlags, mouse.ButtonData);
+
+        if (mouse.LastX == 0 && mouse.LastY == 0 && wheel == 0 && nextButtons == currentButtons)
+        {
+            return;
+        }
+
+        buttonStates[device] = nextButtons;
+        onObservation(new RawMouseObservation(
+            new MouseInputFrame(ClampToInt16(mouse.LastX), ClampToInt16(mouse.LastY), wheel, nextButtons),
+            device,
+            GetDeviceName(device)));
+    }
+
+    private string GetDeviceName(nint device)
+    {
+        if (device == nint.Zero)
+        {
+            return "Unknown device";
+        }
+
+        if (deviceNames.TryGetValue(device, out string? cached))
+        {
+            return cached;
+        }
+
+        uint size = 0;
+        _ = NativeMethods.GetRawInputDeviceInfo(device, DeviceName, nint.Zero, ref size);
+        if (size == 0)
+        {
+            return deviceNames[device] = "Unknown device";
+        }
+
+        nint buffer = Marshal.AllocHGlobal((int)(size * sizeof(char)));
+        try
+        {
+            uint result = NativeMethods.GetRawInputDeviceInfo(device, DeviceName, buffer, ref size);
+            string resolved = result == uint.MaxValue
+                ? "Unknown device"
+                : Marshal.PtrToStringUni(buffer) ?? "Unknown device";
+            deviceNames[device] = resolved;
+            return resolved;
+        }
+        finally
+        {
+            Marshal.FreeHGlobal(buffer);
         }
     }
 
@@ -169,6 +270,12 @@ internal sealed partial class RawMouseInputWindowHook : IDisposable
     private static short ClampToInt16(int value)
     {
         return value > short.MaxValue ? short.MaxValue : value < short.MinValue ? short.MinValue : (short)value;
+    }
+
+    private static int AlignRawInputSize(uint size)
+    {
+        int alignment = IntPtr.Size;
+        return (int)((size + (uint)(alignment - 1)) & ~((uint)alignment - 1));
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -227,5 +334,18 @@ internal sealed partial class RawMouseInputWindowHook : IDisposable
             nint data,
             ref uint size,
             uint headerSize);
+
+        [LibraryImport("user32.dll", SetLastError = true)]
+        public static partial uint GetRawInputBuffer(
+            nint data,
+            ref uint size,
+            uint headerSize);
+
+        [LibraryImport("user32.dll", EntryPoint = "GetRawInputDeviceInfoW", SetLastError = true, StringMarshalling = StringMarshalling.Utf16)]
+        public static partial uint GetRawInputDeviceInfo(
+            nint device,
+            uint command,
+            nint data,
+            ref uint size);
     }
 }

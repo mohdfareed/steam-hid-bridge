@@ -2,71 +2,369 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
     <Grid>
-        <GroupBox Header="Mouse">
-            <Grid>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                </Grid.RowDefinitions>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="110"/>
-                    <ColumnDefinition Width="*"/>
-                </Grid.ColumnDefinitions>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="12"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
 
-                <TextBlock Text="Pointer"/>
-                <TextBlock Grid.Column="1"
-                           Text="{Binding PointerText}"
-                           FontFamily="Consolas"/>
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="110"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
 
-                <TextBlock Grid.Row="1"
-                           Text="Wheel"
-                           Margin="0,8,0,0"/>
-                <TextBlock Grid.Row="1"
-                           Grid.Column="1"
-                           Text="{Binding WheelText}"
-                           FontFamily="Consolas"
-                           Margin="0,8,0,0"/>
+            <TextBlock Text="Forwarding"/>
+            <TextBlock Grid.Column="1"
+                       Text="{Binding ForwardingText}"
+                       FontFamily="Consolas"/>
 
-                <TextBlock Grid.Row="2"
-                           Text="Buttons"
-                           Margin="0,8,0,0"/>
-                <TextBlock Grid.Row="2"
-                           Grid.Column="1"
-                           Text="{Binding MouseButtonsText}"
-                           FontFamily="Consolas"
-                           Margin="0,8,0,0"/>
+            <TextBlock Grid.Row="1"
+                       Text="Output status"
+                       Margin="0,8,0,0"/>
+            <TextBlock Grid.Row="1"
+                       Grid.Column="1"
+                       Text="{Binding OutputTargetText}"
+                       Margin="0,8,0,0"/>
+        </Grid>
 
-                <TextBlock Grid.Row="3"
-                           Text="Last output"
-                           Margin="0,8,0,0"/>
-                <TextBlock Grid.Row="3"
-                           Grid.Column="1"
-                           Text="{Binding LastOutputText}"
-                           FontFamily="Consolas"
-                           Margin="0,8,0,0"/>
+        <Grid Grid.Row="2">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="12"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="12"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
 
-                <TextBlock Grid.Row="4"
-                           Text="Forwarding"
-                           Margin="0,8,0,0"/>
-                <TextBlock Grid.Row="4"
-                           Grid.Column="1"
-                           Text="{Binding ForwardingText}"
-                           FontFamily="Consolas"
-                           Margin="0,8,0,0"/>
+            <GroupBox Header="Input">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="110"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
 
-                <TextBlock Grid.Row="5"
-                           Text="Output"
-                           Margin="0,8,0,0"/>
-                <TextBlock Grid.Row="5"
-                           Grid.Column="1"
-                           Text="{Binding OutputTargetText}"
-                           Margin="0,8,0,0"/>
-            </Grid>
-        </GroupBox>
+                    <TextBlock Text="Device"/>
+                    <StackPanel Grid.Column="1"
+                                Orientation="Horizontal">
+                        <TextBlock Text="{Binding InputDeviceText}"
+                                   TextWrapping="Wrap"
+                                   VerticalAlignment="Center"/>
+                        <Button Content="Pin Next"
+                                Margin="8,0,0,0"
+                                Padding="8,2"
+                                Click="PinNextInput_Click"/>
+                        <Button Content="Clear"
+                                Margin="8,0,0,0"
+                                Padding="8,2"
+                                Click="ClearInputPin_Click"/>
+                    </StackPanel>
 
+                    <TextBlock Grid.Row="1"
+                               Text="Selection"
+                               Margin="0,8,0,0"/>
+                    <TextBlock Grid.Row="1"
+                               Grid.Column="1"
+                               Text="{Binding InputSelectionText}"
+                               Margin="0,8,0,0"
+                               FontStyle="Italic"/>
+
+                    <TextBlock Grid.Row="2"
+                               Text="Pointer"
+                               Margin="0,8,0,0"/>
+                    <TextBlock Grid.Row="2"
+                               Grid.Column="1"
+                               Text="{Binding InputPointerText}"
+                               FontFamily="Consolas"
+                               Margin="0,8,0,0"/>
+
+                    <TextBlock Grid.Row="3"
+                               Text="Wheel"
+                               Margin="0,8,0,0"/>
+                    <TextBlock Grid.Row="3"
+                               Grid.Column="1"
+                               Text="{Binding InputWheelText}"
+                               FontFamily="Consolas"
+                               Margin="0,8,0,0"/>
+
+                    <TextBlock Grid.Row="4"
+                               Text="Buttons"
+                               Margin="0,8,0,0"/>
+                    <StackPanel Grid.Row="4"
+                                Grid.Column="1"
+                                Orientation="Horizontal"
+                                Margin="0,8,0,0">
+                        <StackPanel Orientation="Horizontal"
+                                    Margin="0,0,10,0">
+                            <Ellipse Width="10"
+                                     Height="10"
+                                     Fill="{Binding InputLeftBrush}"
+                                     Stroke="#FF6B7280"
+                                     StrokeThickness="1"
+                                     VerticalAlignment="Center"/>
+                            <TextBlock Text="L"
+                                       Margin="4,0,0,0"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal"
+                                    Margin="0,0,10,0">
+                            <Ellipse Width="10"
+                                     Height="10"
+                                     Fill="{Binding InputRightBrush}"
+                                     Stroke="#FF6B7280"
+                                     StrokeThickness="1"
+                                     VerticalAlignment="Center"/>
+                            <TextBlock Text="R"
+                                       Margin="4,0,0,0"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal"
+                                    Margin="0,0,10,0">
+                            <Ellipse Width="10"
+                                     Height="10"
+                                     Fill="{Binding InputMiddleBrush}"
+                                     Stroke="#FF6B7280"
+                                     StrokeThickness="1"
+                                     VerticalAlignment="Center"/>
+                            <TextBlock Text="M"
+                                       Margin="4,0,0,0"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal"
+                                    Margin="0,0,10,0">
+                            <Ellipse Width="10"
+                                     Height="10"
+                                     Fill="{Binding InputBackBrush}"
+                                     Stroke="#FF6B7280"
+                                     StrokeThickness="1"
+                                     VerticalAlignment="Center"/>
+                            <TextBlock Text="B"
+                                       Margin="4,0,0,0"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal">
+                            <Ellipse Width="10"
+                                     Height="10"
+                                     Fill="{Binding InputForwardBrush}"
+                                     Stroke="#FF6B7280"
+                                     StrokeThickness="1"
+                                     VerticalAlignment="Center"/>
+                            <TextBlock Text="F"
+                                       Margin="4,0,0,0"/>
+                        </StackPanel>
+                    </StackPanel>
+                </Grid>
+            </GroupBox>
+
+            <GroupBox Grid.Column="2"
+                      Header="Output">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="110"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <TextBlock Text="Device"/>
+                    <TextBlock Grid.Column="1"
+                               Text="{Binding OutputDeviceText}"
+                               TextWrapping="Wrap"/>
+
+                    <TextBlock Grid.Row="1"
+                               Text="Pointer"
+                               Margin="0,8,0,0"/>
+                    <TextBlock Grid.Row="1"
+                               Grid.Column="1"
+                               Text="{Binding OutputPointerText}"
+                               FontFamily="Consolas"
+                               Margin="0,8,0,0"/>
+
+                    <TextBlock Grid.Row="2"
+                               Text="Wheel"
+                               Margin="0,8,0,0"/>
+                    <TextBlock Grid.Row="2"
+                               Grid.Column="1"
+                               Text="{Binding OutputWheelText}"
+                               FontFamily="Consolas"
+                               Margin="0,8,0,0"/>
+
+                    <TextBlock Grid.Row="3"
+                               Text="Buttons"
+                               Margin="0,8,0,0"/>
+                    <StackPanel Grid.Row="3"
+                                Grid.Column="1"
+                                Orientation="Horizontal"
+                                Margin="0,8,0,0">
+                        <StackPanel Orientation="Horizontal"
+                                    Margin="0,0,10,0">
+                            <Ellipse Width="10"
+                                     Height="10"
+                                     Fill="{Binding OutputLeftBrush}"
+                                     Stroke="#FF6B7280"
+                                     StrokeThickness="1"
+                                     VerticalAlignment="Center"/>
+                            <TextBlock Text="L"
+                                       Margin="4,0,0,0"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal"
+                                    Margin="0,0,10,0">
+                            <Ellipse Width="10"
+                                     Height="10"
+                                     Fill="{Binding OutputRightBrush}"
+                                     Stroke="#FF6B7280"
+                                     StrokeThickness="1"
+                                     VerticalAlignment="Center"/>
+                            <TextBlock Text="R"
+                                       Margin="4,0,0,0"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal"
+                                    Margin="0,0,10,0">
+                            <Ellipse Width="10"
+                                     Height="10"
+                                     Fill="{Binding OutputMiddleBrush}"
+                                     Stroke="#FF6B7280"
+                                     StrokeThickness="1"
+                                     VerticalAlignment="Center"/>
+                            <TextBlock Text="M"
+                                       Margin="4,0,0,0"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal"
+                                    Margin="0,0,10,0">
+                            <Ellipse Width="10"
+                                     Height="10"
+                                     Fill="{Binding OutputBackBrush}"
+                                     Stroke="#FF6B7280"
+                                     StrokeThickness="1"
+                                     VerticalAlignment="Center"/>
+                            <TextBlock Text="B"
+                                       Margin="4,0,0,0"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal">
+                            <Ellipse Width="10"
+                                     Height="10"
+                                     Fill="{Binding OutputForwardBrush}"
+                                     Stroke="#FF6B7280"
+                                     StrokeThickness="1"
+                                     VerticalAlignment="Center"/>
+                            <TextBlock Text="F"
+                                       Margin="4,0,0,0"/>
+                        </StackPanel>
+                    </StackPanel>
+                </Grid>
+            </GroupBox>
+
+            <GroupBox Grid.Row="2"
+                      Grid.ColumnSpan="3"
+                      Header="Manual Board Test">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="24"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="24"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Orientation="Horizontal"
+                                VerticalAlignment="Top">
+                        <CheckBox Content="Left"
+                                  IsChecked="{Binding ManualLeft}"
+                                  Margin="0,0,8,0"/>
+                        <CheckBox Content="Right"
+                                  IsChecked="{Binding ManualRight}"
+                                  Margin="0,0,8,0"/>
+                        <CheckBox Content="Middle"
+                                  IsChecked="{Binding ManualMiddle}"
+                                  Margin="0,0,8,0"/>
+                        <CheckBox Content="Back"
+                                  IsChecked="{Binding ManualBack}"
+                                  Margin="0,0,8,0"/>
+                        <CheckBox Content="Forward"
+                                  IsChecked="{Binding ManualForward}"
+                                  Margin="0,0,8,0"/>
+                        <Button Content="Release"
+                                Click="ReleaseButtons_Click"
+                                ToolTip="Release all held board test buttons."/>
+                    </StackPanel>
+
+                    <UniformGrid Grid.Column="2"
+                                 Rows="3"
+                                 Columns="3">
+                        <RepeatButton Content="↖"
+                                      Delay="250"
+                                      Interval="40"
+                                      Click="MoveBoard_Click"
+                                      Tag="-16,-16"/>
+                        <RepeatButton Content="↑"
+                                      Delay="250"
+                                      Interval="40"
+                                      Click="MoveBoard_Click"
+                                      Tag="0,-16"/>
+                        <RepeatButton Content="↗"
+                                      Delay="250"
+                                      Interval="40"
+                                      Click="MoveBoard_Click"
+                                      Tag="16,-16"/>
+                        <RepeatButton Content="←"
+                                      Delay="250"
+                                      Interval="40"
+                                      Click="MoveBoard_Click"
+                                      Tag="-16,0"/>
+                        <Button Content="•"
+                                IsEnabled="False"/>
+                        <RepeatButton Content="→"
+                                      Delay="250"
+                                      Interval="40"
+                                      Click="MoveBoard_Click"
+                                      Tag="16,0"/>
+                        <RepeatButton Content="↙"
+                                      Delay="250"
+                                      Interval="40"
+                                      Click="MoveBoard_Click"
+                                      Tag="-16,16"/>
+                        <RepeatButton Content="↓"
+                                      Delay="250"
+                                      Interval="40"
+                                      Click="MoveBoard_Click"
+                                      Tag="0,16"/>
+                        <RepeatButton Content="↘"
+                                      Delay="250"
+                                      Interval="40"
+                                      Click="MoveBoard_Click"
+                                      Tag="16,16"/>
+                    </UniformGrid>
+
+                    <StackPanel Grid.Column="4"
+                                VerticalAlignment="Top">
+                        <RepeatButton Content="Wheel +"
+                                      Delay="250"
+                                      Interval="120"
+                                      Click="WheelBoard_Click"
+                                      Tag="1"
+                                      Margin="0,0,0,8"/>
+                        <RepeatButton Content="Wheel -"
+                                      Delay="250"
+                                      Interval="120"
+                                      Click="WheelBoard_Click"
+                                      Tag="-1"/>
+                    </StackPanel>
+                </Grid>
+            </GroupBox>
+        </Grid>
     </Grid>
 </UserControl>

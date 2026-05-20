@@ -7,6 +7,7 @@ using SteamHidBridge.App.Configuration;
 using SteamHidBridge.App.Platform;
 using SteamHidBridge.App.Platform.Teensy;
 using SteamHidBridge.App.Platform.Viiper;
+using SteamHidBridge.Protocol;
 
 namespace SteamHidBridge.App.Core;
 
@@ -38,17 +39,17 @@ internal sealed class BridgeSession : IDisposable
     private bool isForwarding;
     private long outputGeneration;
     private BridgeOutputMode outputMode = BridgeOutputMode.Board;
+    private MouseButtons manualBoardButtons;
 
-    public BridgeSession(int? boardPort, string viiperHost, int viiperPort, bool exitWithOwnedLaunch)
+    public BridgeSession(int? boardPort, string viiperHost, int viiperPort, bool exitWithOwnedLaunch, bool bypassReceiverGate)
     {
-        processMonitor = new SessionProcessMonitor(exitWithOwnedLaunch);
+        processMonitor = new SessionProcessMonitor(exitWithOwnedLaunch, bypassReceiverGate);
         boardOutput = new TeensySerialMouseOutput(boardPort);
         viiperOutput = new ViiperMouseOutput(viiperHost, viiperPort);
         outputTask = Task.Run(RunOutputLoopAsync);
         statusTask = Task.Run(RunStatusLoopAsync);
     }
 
-    public event Action<MouseInputFrame>? MouseInput;
     public event Action<BridgeSessionStatus>? StatusChanged;
     public event Action<int>? ExitRequested;
 
@@ -61,7 +62,6 @@ internal sealed class BridgeSession : IDisposable
         {
             if (!isForwarding || outputMode == BridgeOutputMode.None)
             {
-                MouseInput?.Invoke(frame);
                 return;
             }
 
@@ -70,7 +70,6 @@ internal sealed class BridgeSession : IDisposable
         }
 
         _ = outputQueue.Writer.TryWrite(new QueuedOutput(queuedMode, queuedGeneration, frame));
-        MouseInput?.Invoke(frame);
     }
 
     public void SetOutputMode(BridgeOutputMode value)
@@ -116,6 +115,27 @@ internal sealed class BridgeSession : IDisposable
     public void LaunchProfile()
     {
         processMonitor.LaunchProfile();
+    }
+
+    public void SetBoardDiagnosticButtons(MouseButtons buttons)
+    {
+        lock (syncLock)
+        {
+            manualBoardButtons = buttons;
+        }
+
+        boardOutput.WriteFrame(new MouseInputFrame(0, 0, 0, buttons));
+    }
+
+    public void SendBoardDiagnosticFrame(short deltaX, short deltaY, sbyte wheel)
+    {
+        MouseButtons buttons;
+        lock (syncLock)
+        {
+            buttons = manualBoardButtons;
+        }
+
+        boardOutput.WriteFrame(new MouseInputFrame(deltaX, deltaY, wheel, buttons));
     }
 
     public void Dispose()
@@ -190,7 +210,8 @@ internal sealed class BridgeSession : IDisposable
             return;
         }
 
-        CurrentTarget()?.Refresh();
+        boardOutput.Refresh();
+        viiperOutput.Refresh();
 
         ReceiverState receiverState = processMonitor.Refresh();
         if (receiverState.ShouldExit)
@@ -268,20 +289,6 @@ internal sealed class BridgeSession : IDisposable
         ExitRequested?.Invoke(0);
     }
 
-    private IMouseOutputTarget? CurrentTarget()
-    {
-        lock (syncLock)
-        {
-            return outputMode switch
-            {
-                BridgeOutputMode.Board => boardOutput,
-                BridgeOutputMode.Viiper => viiperOutput,
-                BridgeOutputMode.None => throw new NotImplementedException(),
-                _ => null
-            };
-        }
-    }
-
     private IMouseOutputTarget? GetQueuedTarget(QueuedOutput queued)
     {
         lock (syncLock)
@@ -292,7 +299,7 @@ internal sealed class BridgeSession : IDisposable
                 {
                     BridgeOutputMode.Board => boardOutput,
                     BridgeOutputMode.Viiper => viiperOutput,
-                    BridgeOutputMode.None => throw new NotImplementedException(),
+                    BridgeOutputMode.None => null,
                     _ => null
                 };
         }

@@ -1,18 +1,32 @@
+using System;
 using System.Threading;
 using System.Windows.Threading;
 using SteamHidBridge.App.Configuration;
 using SteamHidBridge.App.Core;
+using SteamHidBridge.App.Platform.Windows;
 using SteamHidBridge.Protocol;
 
 namespace SteamHidBridge.App.Ui.ViewModels;
 
-internal sealed class OutputViewModel : ObservableObject
+internal sealed class OutputViewModel(
+    Action<MouseButtons> applyBoardButtons,
+    Action<short, short, sbyte> sendBoardFrame) : ObservableObject
 {
-    private readonly Lock previewLock = new();
-    private Dispatcher? previewDispatcher;
-    private HidInputReport lastReport;
-    private MouseInputFrame latestPreviewFrame;
-    private bool previewScheduled;
+    private readonly Lock inputLock = new();
+    private readonly Lock outputLock = new();
+    private Dispatcher? inputDispatcher;
+    private Dispatcher? outputDispatcher;
+    private RawMouseObservation latestInputObservation;
+    private RawMouseObservation latestOutputObservation;
+    private MouseInputFrame lastInputFrame;
+    private MouseInputFrame lastOutputFrame;
+    private bool inputScheduled;
+    private bool outputScheduled;
+    private bool manualLeft;
+    private bool manualRight;
+    private bool manualMiddle;
+    private bool manualBack;
+    private bool manualForward;
 
     public string ForwardingText
     {
@@ -26,100 +40,299 @@ internal sealed class OutputViewModel : ObservableObject
         private set => SetProperty(ref field, value);
     } = "Board disconnected";
 
-    public string PointerText => $"dx {lastReport.PointerDeltaX}, dy {lastReport.PointerDeltaY}";
-    public string WheelText => $"wheel {lastReport.VerticalWheel}";
-    public string MouseButtonsText => lastReport.MouseButtons == MouseButtons.None ? "buttons none" : $"buttons {lastReport.MouseButtons}";
-    public string LastOutputText
+    public string InputDeviceText
     {
         get;
         private set => SetProperty(ref field, value);
-    } = "No output yet";
-    public string MouseLeftBrush => MouseButtonBrush(MouseButtons.Left);
-    public string MouseRightBrush => MouseButtonBrush(MouseButtons.Right);
-    public string MouseMiddleBrush => MouseButtonBrush(MouseButtons.Middle);
-    public string MouseBackBrush => MouseButtonBrush(MouseButtons.Back);
-    public string MouseForwardBrush => MouseButtonBrush(MouseButtons.Forward);
+    } = "No input yet";
+
+    public string InputPointerText => $"dx {lastInputFrame.PointerDeltaX}, dy {lastInputFrame.PointerDeltaY}";
+    public string InputWheelText => $"wheel {lastInputFrame.VerticalWheel}";
+
+    public string OutputDeviceText
+    {
+        get;
+        private set => SetProperty(ref field, value);
+    } = "No observed raw output yet";
+
+    public string OutputPointerText => $"dx {lastOutputFrame.PointerDeltaX}, dy {lastOutputFrame.PointerDeltaY}";
+    public string OutputWheelText => $"wheel {lastOutputFrame.VerticalWheel}";
+    public string InputLeftBrush => MouseButtonBrush(lastInputFrame.Buttons, MouseButtons.Left);
+    public string InputRightBrush => MouseButtonBrush(lastInputFrame.Buttons, MouseButtons.Right);
+    public string InputMiddleBrush => MouseButtonBrush(lastInputFrame.Buttons, MouseButtons.Middle);
+    public string InputBackBrush => MouseButtonBrush(lastInputFrame.Buttons, MouseButtons.Back);
+    public string InputForwardBrush => MouseButtonBrush(lastInputFrame.Buttons, MouseButtons.Forward);
+    public string OutputLeftBrush => MouseButtonBrush(lastOutputFrame.Buttons, MouseButtons.Left);
+    public string OutputRightBrush => MouseButtonBrush(lastOutputFrame.Buttons, MouseButtons.Right);
+    public string OutputMiddleBrush => MouseButtonBrush(lastOutputFrame.Buttons, MouseButtons.Middle);
+    public string OutputBackBrush => MouseButtonBrush(lastOutputFrame.Buttons, MouseButtons.Back);
+    public string OutputForwardBrush => MouseButtonBrush(lastOutputFrame.Buttons, MouseButtons.Forward);
+    public string InputSelectionText
+    {
+        get;
+        private set => SetProperty(ref field, value);
+    } = "Automatic";
+    public bool ManualLeft
+    {
+        get => manualLeft;
+        set
+        {
+            if (SetProperty(ref manualLeft, value))
+            {
+                ApplyManualButtons();
+            }
+        }
+    }
+
+    public bool ManualRight
+    {
+        get => manualRight;
+        set
+        {
+            if (SetProperty(ref manualRight, value))
+            {
+                ApplyManualButtons();
+            }
+        }
+    }
+
+    public bool ManualMiddle
+    {
+        get => manualMiddle;
+        set
+        {
+            if (SetProperty(ref manualMiddle, value))
+            {
+                ApplyManualButtons();
+            }
+        }
+    }
+
+    public bool ManualBack
+    {
+        get => manualBack;
+        set
+        {
+            if (SetProperty(ref manualBack, value))
+            {
+                ApplyManualButtons();
+            }
+        }
+    }
+
+    public bool ManualForward
+    {
+        get => manualForward;
+        set
+        {
+            if (SetProperty(ref manualForward, value))
+            {
+                ApplyManualButtons();
+            }
+        }
+    }
+
+    public event Action? PinNextInputRequested;
+    public event Action? ClearInputPinRequested;
 
     public void ApplyRuntimeStatus(BridgeSessionStatus status)
     {
         ForwardingText = status.ForwardingEnabled ? "on" : "off";
         OutputTargetText = FormatOutputTarget(status.OutputMode, status.BoardOutput, status.ViiperOutput);
-        LastOutputText = FormatLastOutput(status.OutputMode, status.BoardOutput, status.ViiperOutput);
     }
 
-    public void PreviewMouseInput(MouseInputFrame frame)
-    {
-        lastReport = new HidInputReport(
-            frame.PointerDeltaX,
-            frame.PointerDeltaY,
-            frame.VerticalWheel,
-            frame.Buttons);
-
-        OnPropertyChanged(nameof(PointerText));
-        OnPropertyChanged(nameof(WheelText));
-        OnPropertyChanged(nameof(MouseButtonsText));
-        OnPropertyChanged(nameof(MouseLeftBrush));
-        OnPropertyChanged(nameof(MouseRightBrush));
-        OnPropertyChanged(nameof(MouseMiddleBrush));
-        OnPropertyChanged(nameof(MouseBackBrush));
-        OnPropertyChanged(nameof(MouseForwardBrush));
-    }
-
-    public void QueuePreviewMouseInput(Dispatcher dispatcher, MouseInputFrame frame)
+    public void QueueInputObservation(Dispatcher dispatcher, RawMouseObservation observation)
     {
         bool schedule;
-        lock (previewLock)
+        lock (inputLock)
         {
-            previewDispatcher = dispatcher;
-            latestPreviewFrame = frame;
-            schedule = !previewScheduled;
+            inputDispatcher = dispatcher;
+            latestInputObservation = observation;
+            schedule = !inputScheduled;
             if (schedule)
             {
-                previewScheduled = true;
+                inputScheduled = true;
             }
         }
 
         if (schedule)
         {
-            _ = dispatcher.BeginInvoke(FlushPreview, DispatcherPriority.Background);
+            _ = dispatcher.BeginInvoke(FlushInput, DispatcherPriority.Background);
         }
     }
 
-    private void FlushPreview()
+    public void QueueOutputObservation(Dispatcher dispatcher, RawMouseObservation observation)
     {
-        Dispatcher? dispatcher;
-        MouseInputFrame frame;
-        lock (previewLock)
+        bool schedule;
+        lock (outputLock)
         {
-            dispatcher = previewDispatcher;
-            frame = latestPreviewFrame;
+            outputDispatcher = dispatcher;
+            latestOutputObservation = observation;
+            schedule = !outputScheduled;
+            if (schedule)
+            {
+                outputScheduled = true;
+            }
         }
 
-        PreviewMouseInput(frame);
+        if (schedule)
+        {
+            _ = dispatcher.BeginInvoke(FlushOutput, DispatcherPriority.Background);
+        }
+    }
+
+    public void MoveBoard(short deltaX, short deltaY)
+    {
+        sendBoardFrame(deltaX, deltaY, 0);
+    }
+
+    public void WheelBoard(sbyte wheel)
+    {
+        sendBoardFrame(0, 0, wheel);
+    }
+
+    public void ClearManualButtons()
+    {
+        manualLeft = false;
+        manualRight = false;
+        manualMiddle = false;
+        manualBack = false;
+        manualForward = false;
+        OnPropertyChanged(nameof(ManualLeft));
+        OnPropertyChanged(nameof(ManualRight));
+        OnPropertyChanged(nameof(ManualMiddle));
+        OnPropertyChanged(nameof(ManualBack));
+        OnPropertyChanged(nameof(ManualForward));
+        ApplyManualButtons();
+    }
+
+    public void RequestPinNextInput()
+    {
+        InputSelectionText = "Waiting for next input device";
+        PinNextInputRequested?.Invoke();
+    }
+
+    public void ClearInputPin()
+    {
+        InputSelectionText = "Automatic";
+        ClearInputPinRequested?.Invoke();
+    }
+
+    public void SetPinnedInputDevice(string deviceName)
+    {
+        InputSelectionText = $"Pinned: {deviceName}";
+    }
+
+    private void FlushInput()
+    {
+        Dispatcher? dispatcher;
+        RawMouseObservation observation;
+        lock (inputLock)
+        {
+            dispatcher = inputDispatcher;
+            observation = latestInputObservation;
+        }
+
+        ApplyInputObservation(observation);
 
         bool reschedule;
-        lock (previewLock)
+        lock (inputLock)
         {
-            if (frame.Equals(latestPreviewFrame))
-            {
-                previewScheduled = false;
-                reschedule = false;
-            }
-            else
-            {
-                reschedule = true;
-            }
+            reschedule = !observation.Equals(latestInputObservation);
+            inputScheduled = reschedule;
         }
 
         if (reschedule)
         {
-            _ = dispatcher?.BeginInvoke(FlushPreview, DispatcherPriority.Background);
+            _ = dispatcher?.BeginInvoke(FlushInput, DispatcherPriority.Background);
         }
     }
 
-    private string MouseButtonBrush(MouseButtons button)
+    private void FlushOutput()
     {
-        return lastReport.MouseButtons.HasFlag(button) ? "SeaGreen" : "White";
+        Dispatcher? dispatcher;
+        RawMouseObservation observation;
+        lock (outputLock)
+        {
+            dispatcher = outputDispatcher;
+            observation = latestOutputObservation;
+        }
+
+        ApplyOutputObservation(observation);
+
+        bool reschedule;
+        lock (outputLock)
+        {
+            reschedule = !observation.Equals(latestOutputObservation);
+            outputScheduled = reschedule;
+        }
+
+        if (reschedule)
+        {
+            _ = dispatcher?.BeginInvoke(FlushOutput, DispatcherPriority.Background);
+        }
+    }
+
+    private void ApplyInputObservation(RawMouseObservation observation)
+    {
+        lastInputFrame = observation.Frame;
+        InputDeviceText = observation.DeviceName;
+        OnPropertyChanged(nameof(InputPointerText));
+        OnPropertyChanged(nameof(InputWheelText));
+        OnPropertyChanged(nameof(InputLeftBrush));
+        OnPropertyChanged(nameof(InputRightBrush));
+        OnPropertyChanged(nameof(InputMiddleBrush));
+        OnPropertyChanged(nameof(InputBackBrush));
+        OnPropertyChanged(nameof(InputForwardBrush));
+    }
+
+    private void ApplyOutputObservation(RawMouseObservation observation)
+    {
+        lastOutputFrame = observation.Frame;
+        OutputDeviceText = observation.DeviceName;
+        OnPropertyChanged(nameof(OutputPointerText));
+        OnPropertyChanged(nameof(OutputWheelText));
+        OnPropertyChanged(nameof(OutputLeftBrush));
+        OnPropertyChanged(nameof(OutputRightBrush));
+        OnPropertyChanged(nameof(OutputMiddleBrush));
+        OnPropertyChanged(nameof(OutputBackBrush));
+        OnPropertyChanged(nameof(OutputForwardBrush));
+    }
+
+    private static string MouseButtonBrush(MouseButtons buttons, MouseButtons button)
+    {
+        return buttons.HasFlag(button) ? "SeaGreen" : "#FF9CA3AF";
+    }
+
+    private void ApplyManualButtons()
+    {
+        MouseButtons buttons = MouseButtons.None;
+        if (manualLeft)
+        {
+            buttons |= MouseButtons.Left;
+        }
+
+        if (manualRight)
+        {
+            buttons |= MouseButtons.Right;
+        }
+
+        if (manualMiddle)
+        {
+            buttons |= MouseButtons.Middle;
+        }
+
+        if (manualBack)
+        {
+            buttons |= MouseButtons.Back;
+        }
+
+        if (manualForward)
+        {
+            buttons |= MouseButtons.Forward;
+        }
+
+        applyBoardButtons(buttons);
     }
 
     private static string FormatOutputTarget(BridgeOutputMode outputMode, OutputStatus boardStatus, OutputStatus viiperStatus)
@@ -163,20 +376,5 @@ internal sealed class OutputViewModel : ObservableObject
             },
             _ => "Unknown output"
         };
-    }
-
-    private static string FormatLastOutput(BridgeOutputMode outputMode, OutputStatus boardStatus, OutputStatus viiperStatus)
-    {
-        MouseInputFrame? frame = outputMode switch
-        {
-            BridgeOutputMode.Board => boardStatus.LastFrame,
-            BridgeOutputMode.Viiper => viiperStatus.LastFrame,
-            BridgeOutputMode.None => null,
-            _ => null
-        };
-
-        return frame is MouseInputFrame value
-            ? $"dx {value.PointerDeltaX}, dy {value.PointerDeltaY}, wheel {value.VerticalWheel}, buttons {(value.Buttons == MouseButtons.None ? "none" : value.Buttons)}"
-            : "No output yet";
     }
 }

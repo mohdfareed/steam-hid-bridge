@@ -28,13 +28,40 @@
                                                          Stroke="{Binding BoardStatusBrush}"
                                                          ToolTip="{Binding BoardStatusToolTip}"/>
                                         </StackPanel>
-                                        <TextBox Grid.Column="1"
-                                                 Grid.ColumnSpan="2"
-                                                 InputScope="Number"
-                                                 Text="{Binding BoardPort, UpdateSourceTrigger=PropertyChanged}"
-                                                 PreviewTextInput="BoardPort_PreviewTextInput"
-                                                 DataObject.Pasting="BoardPort_Pasting"
-                                                 ToolTip="Enter the COM port number. Leave empty for Auto."/>
+                                        <Grid Grid.Column="1"
+                                              Grid.ColumnSpan="2">
+                                                <TextBox x:Name="BoardPortTextBox"
+                                                         InputScope="Number"
+                                                         Text="{Binding BoardPort, UpdateSourceTrigger=PropertyChanged}"
+                                                         PreviewTextInput="BoardPort_PreviewTextInput"
+                                                         DataObject.Pasting="BoardPort_Pasting"
+                                                         ToolTip="Enter the COM port number. Leave empty for Auto."/>
+                                                <TextBlock Text="Auto"
+                                                           Margin="6,0,0,0"
+                                                           VerticalAlignment="Center"
+                                                           Foreground="#FF6B7280"
+                                                           FontStyle="Italic"
+                                                           IsHitTestVisible="False">
+                                                        <TextBlock.Style>
+                                                                <Style TargetType="TextBlock">
+                                                                        <Setter Property="Visibility"
+                                                                                Value="Collapsed"/>
+                                                                        <Style.Triggers>
+                                                                                <MultiDataTrigger>
+                                                                                        <MultiDataTrigger.Conditions>
+                                                                                                <Condition Binding="{Binding Text, ElementName=BoardPortTextBox}"
+                                                                                                           Value=""/>
+                                                                                                <Condition Binding="{Binding IsKeyboardFocusWithin, ElementName=BoardPortTextBox}"
+                                                                                                           Value="False"/>
+                                                                                        </MultiDataTrigger.Conditions>
+                                                                                        <Setter Property="Visibility"
+                                                                                                Value="Visible"/>
+                                                                                </MultiDataTrigger>
+                                                                        </Style.Triggers>
+                                                                </Style>
+                                                        </TextBlock.Style>
+                                                </TextBlock>
+                                        </Grid>
 
                                         <TextBlock Grid.Row="1"
                                                    Text="Board firmware"

@@ -31,6 +31,10 @@ public partial class App : Application
     private BridgeSession? bridgeSession;
     private ShutdownSignalListener? shutdownSignalListener;
     private RawMouseInputWindowHook? rawMouseInputWindowHook;
+    private OutputViewModel? diagnosticsViewModel;
+    private bool forwardingEnabled;
+    private nint bridgeInputDevice;
+    private bool pinNextInputDevice;
     private bool hideMainWindowToTrayOnClose;
     private bool isExiting;
 
@@ -58,6 +62,9 @@ public partial class App : Application
             hideMainWindowToTrayOnClose = !string.IsNullOrWhiteSpace(launchOptions.ProfileId);
             AppRuntime runtime = CreateRuntime(launchOptions, LoadSettingsWithRecovery());
             bridgeSession = runtime.BridgeSession;
+            diagnosticsViewModel = runtime.OutputViewModel;
+            runtime.OutputViewModel.PinNextInputRequested += OnPinNextInputRequested;
+            runtime.OutputViewModel.ClearInputPinRequested += OnClearInputPinRequested;
             WireSessionEvents(
                 runtime.BridgeSession,
                 runtime.OutputViewModel,
@@ -81,7 +88,7 @@ public partial class App : Application
             MainWindow = window;
 
             trayIconHost = new TrayIconHost(window, runtime.MainWindowViewModel.TrayText, () => ExitApplication(0));
-            rawMouseInputWindowHook = new RawMouseInputWindowHook(window, bridgeSession.PublishMouseInput);
+            rawMouseInputWindowHook = new RawMouseInputWindowHook(window, OnRawMouseObservation);
             if (!string.IsNullOrWhiteSpace(launchOptions.ProfileId))
             {
                 window.ShowInTaskbar = false;
@@ -166,7 +173,8 @@ public partial class App : Application
             appService.BoardPort,
             appService.ViiperHost,
             appService.ViiperPort,
-            !string.IsNullOrWhiteSpace(launchOptions.ProfileId));
+            !string.IsNullOrWhiteSpace(launchOptions.ProfileId),
+            launchOptions.TestBench);
         ProfileSettingsViewModel profileSettingsViewModel = new(appService, session, launchOptions.ProfileId);
         GeneralSettingsViewModel generalSettingsViewModel = new(
             appService,
@@ -174,7 +182,7 @@ public partial class App : Application
             session.SetViiperEndpoint,
             AppThemeManager.Apply,
             ConfirmUpdate);
-        OutputViewModel outputViewModel = new();
+        OutputViewModel outputViewModel = new(session.SetBoardDiagnosticButtons, session.SendBoardDiagnosticFrame);
         MainWindowViewModel mainWindowViewModel = new(
             launchOptions.ProfileId,
             profileSettingsViewModel,
@@ -195,14 +203,61 @@ public partial class App : Application
         ProfileSettingsViewModel profileSettingsViewModel,
         GeneralSettingsViewModel generalSettingsViewModel)
     {
-        session.MouseInput += frame => outputViewModel.QueuePreviewMouseInput(Dispatcher, frame);
         session.StatusChanged += status => Dispatcher.BeginInvoke(() =>
         {
+            forwardingEnabled = status.ForwardingEnabled;
+            if (!status.ForwardingEnabled && !status.HasRunningLaunch)
+            {
+                bridgeInputDevice = nint.Zero;
+            }
+
             outputViewModel.ApplyRuntimeStatus(status);
             profileSettingsViewModel.ApplySessionStatus(status);
             generalSettingsViewModel.ApplySessionStatus(status);
         });
         session.ExitRequested += exitCode => Dispatcher.BeginInvoke(() => ExitApplication(exitCode));
+    }
+
+    private void OnRawMouseObservation(RawMouseObservation observation)
+    {
+        if (diagnosticsViewModel is null || bridgeSession is null)
+        {
+            return;
+        }
+
+        if (pinNextInputDevice)
+        {
+            bridgeInputDevice = observation.Device;
+            pinNextInputDevice = false;
+            diagnosticsViewModel.SetPinnedInputDevice(observation.DeviceName);
+        }
+
+        if (ShouldTreatAsBridgeInputObservation(observation))
+        {
+            bridgeInputDevice = observation.Device;
+            diagnosticsViewModel.QueueInputObservation(Dispatcher, observation);
+            bridgeSession.PublishMouseInput(observation.Frame);
+            return;
+        }
+
+        diagnosticsViewModel.QueueOutputObservation(Dispatcher, observation);
+    }
+
+    private bool ShouldTreatAsBridgeInputObservation(RawMouseObservation observation)
+    {
+        return bridgeInputDevice != nint.Zero ? observation.Device == bridgeInputDevice : forwardingEnabled;
+    }
+
+    private void OnPinNextInputRequested()
+    {
+        pinNextInputDevice = true;
+        bridgeInputDevice = nint.Zero;
+    }
+
+    private void OnClearInputPinRequested()
+    {
+        pinNextInputDevice = false;
+        bridgeInputDevice = nint.Zero;
     }
 
     private void ExitApplication(int exitCode)

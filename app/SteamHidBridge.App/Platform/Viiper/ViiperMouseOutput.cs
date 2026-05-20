@@ -1,7 +1,7 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading;
-using System.Threading.Channels;
 using System.Threading.Tasks;
 using SteamHidBridge.App.Core;
 using SteamHidBridge.Protocol;
@@ -11,23 +11,25 @@ using Viiper.Client.Types;
 
 namespace SteamHidBridge.App.Platform.Viiper;
 
-internal sealed class ViiperMouseOutput : IDisposable
+internal sealed class ViiperMouseOutput : IMouseOutputTarget
 {
+    private static readonly TimeSpan DrainInterval = TimeSpan.FromMilliseconds(1);
     private static readonly TimeSpan ReconnectInterval = TimeSpan.FromSeconds(1);
     private readonly Lock syncLock = new();
-    private readonly Channel<QueuedFrame> frameQueue = Channel.CreateUnbounded<QueuedFrame>(new UnboundedChannelOptions
-    {
-        SingleReader = true,
-        SingleWriter = false
-    });
+    private readonly SemaphoreSlim wakeSignal = new(0, 1);
     private readonly CancellationTokenSource cancellation = new();
     private readonly Task writerTask;
+    private readonly Queue<MouseInputFrame> pendingReports = [];
     private ViiperClient? client;
     private ViiperDevice? device;
     private string host;
     private int port;
+    private int pendingSignal;
+    private int accumulatedDeltaX;
+    private int accumulatedDeltaY;
+    private int accumulatedWheel;
     private long nextConnectAttempt;
-    private long generation;
+    private MouseButtons currentButtons;
     private bool enabled;
     private bool isDisposed;
     private OutputStatus status;
@@ -58,7 +60,6 @@ internal sealed class ViiperMouseOutput : IDisposable
             }
 
             enabled = value;
-            generation++;
             if (value)
             {
                 nextConnectAttempt = 0;
@@ -66,6 +67,7 @@ internal sealed class ViiperMouseOutput : IDisposable
                 return;
             }
 
+            ClearPendingLocked();
             DisconnectLocked();
             status = new(OutputConnectionState.Idle, EndpointText(host, port), LastFrame: status.LastFrame);
         }
@@ -77,8 +79,8 @@ internal sealed class ViiperMouseOutput : IDisposable
         {
             this.host = host;
             this.port = port;
-            generation++;
             nextConnectAttempt = 0;
+            ClearPendingLocked();
             DisconnectLocked();
             status = enabled
                 ? new OutputStatus(OutputConnectionState.Disconnected, EndpointText(host, port), LastFrame: status.LastFrame)
@@ -106,29 +108,34 @@ internal sealed class ViiperMouseOutput : IDisposable
         }
     }
 
-    public void Consume(MouseInputFrame frame)
+    public void WriteFrame(MouseInputFrame frame)
     {
-        long currentGeneration;
         lock (syncLock)
         {
-            if (isDisposed || !enabled)
+            if (isDisposed || !enabled || device is null)
             {
                 return;
             }
 
-            currentGeneration = generation;
+            if (frame.Buttons != currentButtons)
+            {
+                EnqueueAccumulatedLocked();
+                pendingReports.Enqueue(frame);
+                currentButtons = frame.Buttons;
+            }
+            else
+            {
+                accumulatedDeltaX += frame.PointerDeltaX;
+                accumulatedDeltaY += frame.PointerDeltaY;
+                accumulatedWheel += frame.VerticalWheel;
+            }
         }
 
-        _ = frameQueue.Writer.TryWrite(new QueuedFrame(currentGeneration, frame));
+        SignalWriter();
     }
 
     public void ResetState()
     {
-        string endpoint;
-        MouseInputFrame zeroFrame = new(0, 0, 0, MouseButtons.None);
-        ViiperDevice? activeDevice;
-        long currentGeneration;
-
         lock (syncLock)
         {
             if (isDisposed)
@@ -136,36 +143,24 @@ internal sealed class ViiperMouseOutput : IDisposable
                 return;
             }
 
-            generation++;
-            currentGeneration = generation;
-            endpoint = EndpointText(host, port);
-            activeDevice = enabled ? device : null;
-        }
+            ClearPendingLocked();
+            if (!enabled || device is null)
+            {
+                return;
+            }
 
-        if (activeDevice is not null)
-        {
+            MouseInputFrame zeroFrame = new(0, 0, 0, MouseButtons.None);
             try
             {
-                activeDevice.SendAsync(ToMouseInput(zeroFrame)).GetAwaiter().GetResult();
-                lock (syncLock)
-                {
-                    if (!isDisposed && generation == currentGeneration)
-                    {
-                        status = new OutputStatus(OutputConnectionState.Connected, endpoint, LastFrame: zeroFrame);
-                    }
-                }
+                device.SendAsync(ToMouseInput(zeroFrame)).GetAwaiter().GetResult();
+                currentButtons = MouseButtons.None;
+                status = new OutputStatus(OutputConnectionState.Connected, EndpointText(host, port), LastFrame: zeroFrame);
             }
             catch (Exception ex)
             {
                 Trace.TraceError($"viiper-reset-failed{Environment.NewLine}{ex}");
-                lock (syncLock)
-                {
-                    if (!isDisposed && generation == currentGeneration)
-                    {
-                        status = new OutputStatus(OutputConnectionState.Error, endpoint, OutputError.WriteFailed, zeroFrame);
-                        DisconnectLocked();
-                    }
-                }
+                status = new OutputStatus(OutputConnectionState.Error, EndpointText(host, port), OutputError.WriteFailed, zeroFrame);
+                DisconnectLocked();
             }
         }
     }
@@ -180,7 +175,7 @@ internal sealed class ViiperMouseOutput : IDisposable
             }
 
             isDisposed = true;
-            generation++;
+            ClearPendingLocked();
             DisconnectLocked();
         }
 
@@ -193,33 +188,19 @@ internal sealed class ViiperMouseOutput : IDisposable
         {
         }
 
+        wakeSignal.Dispose();
         cancellation.Dispose();
     }
 
     private async Task RunWriterAsync()
     {
-        QueuedFrame? carry = null;
         try
         {
             while (!cancellation.IsCancellationRequested)
             {
-                QueuedFrame queued = carry ?? await frameQueue.Reader.ReadAsync(cancellation.Token).ConfigureAwait(false);
-                carry = null;
-
-                MouseInputFrame mergedFrame = queued.Frame;
-                while (frameQueue.Reader.TryRead(out QueuedFrame next))
-                {
-                    if (next.Generation == queued.Generation && next.Frame.Buttons == mergedFrame.Buttons)
-                    {
-                        mergedFrame = Merge(mergedFrame, next.Frame);
-                        continue;
-                    }
-
-                    carry = next;
-                    break;
-                }
-
-                await SendFrameAsync(queued.Generation, mergedFrame).ConfigureAwait(false);
+                _ = await wakeSignal.WaitAsync(DrainInterval, cancellation.Token).ConfigureAwait(false);
+                _ = Interlocked.Exchange(ref pendingSignal, 0);
+                await FlushPendingAsync().ConfigureAwait(false);
             }
         }
         catch (OperationCanceledException)
@@ -227,49 +208,61 @@ internal sealed class ViiperMouseOutput : IDisposable
         }
     }
 
-    private async Task SendFrameAsync(long queuedGeneration, MouseInputFrame frame)
+    private async Task FlushPendingAsync()
     {
+        List<MouseInputFrame> reports = [];
         ViiperDevice? activeDevice;
         string endpoint;
 
         lock (syncLock)
         {
-            endpoint = EndpointText(host, port);
-            if (isDisposed || !enabled || queuedGeneration != generation || device is null)
+            if (isDisposed || !enabled || device is null)
             {
                 return;
             }
 
             activeDevice = device;
-        }
+            endpoint = EndpointText(host, port);
 
-        try
-        {
-            await activeDevice.SendAsync(ToMouseInput(frame)).ConfigureAwait(false);
-            if (frame.PointerDeltaX != 0 || frame.PointerDeltaY != 0 || frame.VerticalWheel != 0)
+            while (pendingReports.Count > 0)
             {
-                MouseInputFrame settledFrame = new(0, 0, 0, frame.Buttons);
-                await activeDevice.SendAsync(ToMouseInput(settledFrame)).ConfigureAwait(false);
+                reports.Add(pendingReports.Dequeue());
             }
 
-            lock (syncLock)
+            MouseInputFrame? accumulated = TakeAccumulatedLocked();
+            if (accumulated is MouseInputFrame frame)
             {
-                if (!isDisposed && enabled && queuedGeneration == generation)
-                {
-                    status = new OutputStatus(OutputConnectionState.Connected, endpoint, LastFrame: frame);
-                }
+                reports.Add(frame);
             }
         }
-        catch (Exception ex)
+
+        foreach (MouseInputFrame frame in reports)
         {
-            Trace.TraceError($"viiper-write-failed{Environment.NewLine}{ex}");
-            lock (syncLock)
+            try
             {
-                if (!isDisposed && queuedGeneration == generation)
+                await activeDevice.SendAsync(ToMouseInput(frame)).ConfigureAwait(false);
+                lock (syncLock)
                 {
-                    status = new OutputStatus(OutputConnectionState.Error, endpoint, OutputError.WriteFailed, frame);
-                    DisconnectLocked();
+                    if (!isDisposed && enabled && device is not null)
+                    {
+                        status = new OutputStatus(OutputConnectionState.Connected, endpoint, LastFrame: frame);
+                    }
                 }
+            }
+            catch (Exception ex)
+            {
+                Trace.TraceError($"viiper-write-failed{Environment.NewLine}{ex}");
+                lock (syncLock)
+                {
+                    if (!isDisposed)
+                    {
+                        status = new OutputStatus(OutputConnectionState.Error, endpoint, OutputError.WriteFailed, frame);
+                        ClearPendingLocked();
+                        DisconnectLocked();
+                    }
+                }
+
+                return;
             }
         }
     }
@@ -303,6 +296,7 @@ internal sealed class ViiperMouseOutput : IDisposable
                     }
 
                     device = null;
+                    ClearPendingLocked();
                     status = new OutputStatus(OutputConnectionState.Disconnected, EndpointText(host, port), LastFrame: status.LastFrame);
                 }
             };
@@ -311,6 +305,7 @@ internal sealed class ViiperMouseOutput : IDisposable
         catch (Exception ex)
         {
             Trace.TraceError($"viiper-connect-failed{Environment.NewLine}{ex}");
+            ClearPendingLocked();
             DisconnectLocked();
             status = new OutputStatus(OutputConnectionState.Error, endpoint, OutputError.ConnectFailed, status.LastFrame);
         }
@@ -343,35 +338,53 @@ internal sealed class ViiperMouseOutput : IDisposable
         }
     }
 
-    private static MouseInputFrame Merge(MouseInputFrame current, MouseInputFrame next)
+    private void SignalWriter()
     {
-        return new MouseInputFrame(
-            SaturatingAdd(current.PointerDeltaX, next.PointerDeltaX),
-            SaturatingAdd(current.PointerDeltaY, next.PointerDeltaY),
-            SaturatingAdd(current.VerticalWheel, next.VerticalWheel),
-            current.Buttons);
+        if (Interlocked.Exchange(ref pendingSignal, 1) == 0)
+        {
+            _ = wakeSignal.Release();
+        }
     }
 
-    private static short SaturatingAdd(short left, short right)
+    private MouseInputFrame? TakeAccumulatedLocked()
     {
-        int value = left + right;
-        return value switch
+        if (accumulatedDeltaX == 0 && accumulatedDeltaY == 0 && accumulatedWheel == 0)
         {
-            > short.MaxValue => short.MaxValue,
-            < short.MinValue => short.MinValue,
-            _ => (short)value
-        };
+            return null;
+        }
+
+        MouseInputFrame frame = new(
+            ClampToInt16(accumulatedDeltaX),
+            ClampToInt16(accumulatedDeltaY),
+            ClampToSByte(accumulatedWheel),
+            currentButtons);
+        accumulatedDeltaX = 0;
+        accumulatedDeltaY = 0;
+        accumulatedWheel = 0;
+        return frame;
     }
 
-    private static sbyte SaturatingAdd(sbyte left, sbyte right)
+    private void EnqueueAccumulatedLocked()
     {
-        int value = left + right;
-        return value switch
+        MouseInputFrame? accumulated = TakeAccumulatedLocked();
+        if (accumulated is MouseInputFrame frame)
         {
-            > sbyte.MaxValue => sbyte.MaxValue,
-            < sbyte.MinValue => sbyte.MinValue,
-            _ => (sbyte)value
-        };
+            pendingReports.Enqueue(frame);
+        }
+    }
+
+    private void ClearPendingLocked()
+    {
+        pendingReports.Clear();
+        accumulatedDeltaX = 0;
+        accumulatedDeltaY = 0;
+        accumulatedWheel = 0;
+        currentButtons = MouseButtons.None;
+        _ = Interlocked.Exchange(ref pendingSignal, 0);
+        while (wakeSignal.CurrentCount > 0)
+        {
+            _ = wakeSignal.Wait(0);
+        }
     }
 
     private static MouseInput ToMouseInput(MouseInputFrame frame)
@@ -391,5 +404,13 @@ internal sealed class ViiperMouseOutput : IDisposable
         return $"{host}:{port}";
     }
 
-    private readonly record struct QueuedFrame(long Generation, MouseInputFrame Frame);
+    private static short ClampToInt16(int value)
+    {
+        return value > short.MaxValue ? short.MaxValue : value < short.MinValue ? short.MinValue : (short)value;
+    }
+
+    private static sbyte ClampToSByte(int value)
+    {
+        return value > sbyte.MaxValue ? sbyte.MaxValue : value < sbyte.MinValue ? sbyte.MinValue : (sbyte)value;
+    }
 }
